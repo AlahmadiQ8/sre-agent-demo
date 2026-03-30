@@ -1,5 +1,6 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using ContosoBank.Data;
+using ContosoBank.Interceptors;
 using ContosoBank.Metrics;
 using ContosoBank.Services;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,10 @@ builder.Services.AddProblemDetails();
 // Observability — custom business + reliability metrics
 builder.Services.AddSingleton<BankMetrics>();
 
+// Chaos engineering — singleton failure injection engine
+builder.Services.AddSingleton<IChaosService, ChaosService>();
+builder.Services.AddSingleton<ChaosDbInterceptor>();
+
 // Business services
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
@@ -32,13 +37,15 @@ builder.Services.AddScoped<IReportService, ReportService>();
 // Database — InMemory for development, SQL Server for production
 if (builder.Environment.IsDevelopment())
 {
-    builder.Services.AddDbContext<BankDbContext>(options =>
-        options.UseInMemoryDatabase("ContosoBank"));
+    builder.Services.AddDbContext<BankDbContext>((sp, options) =>
+        options.UseInMemoryDatabase("ContosoBank")
+            .AddInterceptors(sp.GetRequiredService<ChaosDbInterceptor>()));
 }
 else
 {
-    builder.Services.AddDbContext<BankDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddDbContext<BankDbContext>((sp, options) =>
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+            .AddInterceptors(sp.GetRequiredService<ChaosDbInterceptor>()));
 }
 
 // Health checks

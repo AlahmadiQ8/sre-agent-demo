@@ -10,12 +10,15 @@ namespace ContosoBank.Tests.Controllers;
 public class AccountsControllerTests
 {
     private readonly Mock<IAccountService> _mockService;
+    private readonly Mock<IChaosService> _mockChaos;
     private readonly AccountsController _controller;
 
     public AccountsControllerTests()
     {
         _mockService = new Mock<IAccountService>();
-        _controller = new AccountsController(_mockService.Object, Mock.Of<ILogger<AccountsController>>());
+        _mockChaos = new Mock<IChaosService>();
+        _mockChaos.Setup(c => c.GetStatus()).Returns(new ChaosStatus());
+        _controller = new AccountsController(_mockService.Object, _mockChaos.Object, Mock.Of<ILogger<AccountsController>>());
     }
 
     [Fact]

@@ -8,11 +8,13 @@ namespace ContosoBank.Controllers;
 public class TransactionsController : ControllerBase
 {
     private readonly ITransactionService _transactionService;
+    private readonly IChaosService _chaosService;
     private readonly ILogger<TransactionsController> _logger;
 
-    public TransactionsController(ITransactionService transactionService, ILogger<TransactionsController> logger)
+    public TransactionsController(ITransactionService transactionService, IChaosService chaosService, ILogger<TransactionsController> logger)
     {
         _transactionService = transactionService;
+        _chaosService = chaosService;
         _logger = logger;
     }
 
@@ -52,5 +54,22 @@ public class TransactionsController : ControllerBase
         }
 
         return Ok(transaction);
+    }
+
+    [HttpPost("export")]
+    public async Task<IActionResult> ExportFullHistory()
+    {
+        _logger.LogInformation("Full transaction history export requested");
+
+        // Chaos Scenario 7: Log Flooding — writes thousands of verbose log entries per second
+        await _chaosService.TriggerLogFlooding();
+
+        var transactions = await _transactionService.GetAllTransactionsAsync();
+        return Ok(new
+        {
+            ExportedAt = DateTime.UtcNow,
+            TotalTransactions = transactions.Count(),
+            Message = "Transaction history export completed."
+        });
     }
 }

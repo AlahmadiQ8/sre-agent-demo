@@ -43,9 +43,6 @@ public class MetricsIntegrationTests
         var failRequest = new TransferRequest(1, 1, 10m);
         await _client.PostAsJsonAsync("/api/transfers", failRequest);
 
-        // Trigger reconciliation to generate TransactionsProcessed metrics
-        await _client.PostAsync("/api/reports/reconciliation", null);
-
         // Wait for metrics collection cycle to capture all observations
         await Task.Delay(1000);
 
@@ -60,11 +57,6 @@ public class MetricsIntegrationTests
 
         // Assert transfer metrics with failed label
         Assert.Matches(@"status\s*=\s*""failed""", body);
-
-        // Assert transactions processed metrics
-        Assert.Contains("contosobank_transactions_processed", body);
-        Assert.Matches(@"type\s*=\s*""credit""", body);
-        Assert.Matches(@"type\s*=\s*""debit""", body);
     }
 
     [Fact]

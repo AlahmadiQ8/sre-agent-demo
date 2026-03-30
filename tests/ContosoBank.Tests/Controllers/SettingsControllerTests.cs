@@ -1,4 +1,5 @@
 using ContosoBank.Controllers;
+using ContosoBank.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -7,17 +8,20 @@ namespace ContosoBank.Tests.Controllers;
 
 public class SettingsControllerTests
 {
+    private readonly Mock<IChaosService> _mockChaos;
     private readonly SettingsController _controller;
 
     public SettingsControllerTests()
     {
-        _controller = new SettingsController(Mock.Of<ILogger<SettingsController>>());
+        _mockChaos = new Mock<IChaosService>();
+        _mockChaos.Setup(c => c.GetStatus()).Returns(new ChaosStatus());
+        _controller = new SettingsController(_mockChaos.Object, Mock.Of<ILogger<SettingsController>>());
     }
 
     [Fact]
-    public void VerifyIdentity_ReturnsOk()
+    public async Task VerifyIdentity_ReturnsOk()
     {
-        var result = _controller.VerifyIdentity();
+        var result = await _controller.VerifyIdentity();
 
         Assert.IsType<OkObjectResult>(result);
     }

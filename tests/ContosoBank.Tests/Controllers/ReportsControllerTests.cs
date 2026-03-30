@@ -9,12 +9,15 @@ namespace ContosoBank.Tests.Controllers;
 public class ReportsControllerTests
 {
     private readonly Mock<IReportService> _mockService;
+    private readonly Mock<IChaosService> _mockChaos;
     private readonly ReportsController _controller;
 
     public ReportsControllerTests()
     {
         _mockService = new Mock<IReportService>();
-        _controller = new ReportsController(_mockService.Object, Mock.Of<ILogger<ReportsController>>());
+        _mockChaos = new Mock<IChaosService>();
+        _mockChaos.Setup(c => c.GetStatus()).Returns(new ChaosStatus());
+        _controller = new ReportsController(_mockService.Object, _mockChaos.Object, Mock.Of<ILogger<ReportsController>>());
     }
 
     [Fact]

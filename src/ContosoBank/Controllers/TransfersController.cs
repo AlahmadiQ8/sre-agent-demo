@@ -8,11 +8,13 @@ namespace ContosoBank.Controllers;
 public class TransfersController : ControllerBase
 {
     private readonly ITransferService _transferService;
+    private readonly IChaosService _chaosService;
     private readonly ILogger<TransfersController> _logger;
 
-    public TransfersController(ITransferService transferService, ILogger<TransfersController> logger)
+    public TransfersController(ITransferService transferService, IChaosService chaosService, ILogger<TransfersController> logger)
     {
         _transferService = transferService;
+        _chaosService = chaosService;
         _logger = logger;
     }
 
@@ -56,10 +58,20 @@ public class TransfersController : ControllerBase
     [HttpPost("wire")]
     public async Task<IActionResult> WireTransfer([FromBody] TransferRequest request)
     {
-        // Wire transfers use the same internal transfer model — this endpoint
-        // exists as a chaos trigger (Scenario 3: HTTP 500 Errors)
         _logger.LogInformation("Processing wire transfer: {Amount} from {FromAccountId} to {ToAccountId}",
             request.Amount, request.FromAccountId, request.ToAccountId);
+
+        // Chaos Scenario 3: HTTP 500 Errors — activates and immediately fails
+        await _chaosService.TriggerHttpErrors();
+
+        if (_chaosService.GetStatus().IsHttpErrorsActive)
+        {
+            _logger.LogError("Wire transfer failed: payment processor unavailable (simulated outage)");
+            return Problem(
+                title: "Wire transfer failed",
+                detail: "The payment processor is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
 
         var result = await _transferService.CreateTransferAsync(request);
         if (!result.Success)
@@ -76,10 +88,17 @@ public class TransfersController : ControllerBase
     [HttpPost("international")]
     public async Task<IActionResult> InternationalTransfer([FromBody] TransferRequest request)
     {
-        // International transfers use the same internal transfer model — this endpoint
-        // exists as a chaos trigger (Scenario 5: Slow API / High Latency)
         _logger.LogInformation("Processing international transfer: {Amount} from {FromAccountId} to {ToAccountId}",
             request.Amount, request.FromAccountId, request.ToAccountId);
+
+        // Chaos Scenario 5: Slow API / High Latency — activates then delays
+        await _chaosService.TriggerSlowResponses();
+
+        if (_chaosService.GetStatus().IsSlowResponsesActive)
+        {
+            _logger.LogWarning("International transfer experiencing high latency (simulated SWIFT delay)");
+            await Task.Delay(30_000);
+        }
 
         var result = await _transferService.CreateTransferAsync(request);
         if (!result.Success)

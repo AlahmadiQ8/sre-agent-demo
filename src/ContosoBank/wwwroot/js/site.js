@@ -129,11 +129,8 @@ async function initDashboard() {
         fraudBtn.addEventListener('click', async () => {
             setLoading(fraudBtn, true);
             try {
-                await api('/api/accounts', { method: 'GET' });
-                showToast('Fraud detection scan running...', 'info', 6000);
-                // The actual chaos trigger is a specific endpoint pattern
-                // In real chaos setup, this would call a dedicated endpoint
-                showToast('No suspicious activity detected', 'success');
+                await api('/api/accounts/fraud-detection', { method: 'POST' });
+                showToast('Fraud detection scan running... Scanning transactions for suspicious activity.', 'info', 6000);
             } catch (err) {
                 showToast('Fraud detection failed: ' + err.message, 'error');
             } finally {
@@ -235,6 +232,7 @@ async function initAccounts() {
         refreshBtn.addEventListener('click', async () => {
             setLoading(refreshBtn, true);
             try {
+                await api('/api/accounts/refresh', { method: 'POST' });
                 await loadAccounts();
                 showToast('Accounts refreshed successfully', 'success');
             } catch (err) {
@@ -411,7 +409,7 @@ async function initTransactions() {
             setLoading(exportBtn, true);
             showToast('Preparing full transaction export...', 'info', 6000);
             try {
-                await api('/api/transactions');
+                await api('/api/transactions/export', { method: 'POST' });
                 showToast('Transaction history exported', 'success');
             } catch (err) {
                 showToast('Export failed: ' + err.message, 'error');

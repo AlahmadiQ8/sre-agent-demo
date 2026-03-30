@@ -1,3 +1,4 @@
+using ContosoBank.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ContosoBank.Controllers;
@@ -6,19 +7,31 @@ namespace ContosoBank.Controllers;
 [Route("api/[controller]")]
 public class SettingsController : ControllerBase
 {
+    private readonly IChaosService _chaosService;
     private readonly ILogger<SettingsController> _logger;
 
-    public SettingsController(ILogger<SettingsController> logger)
+    public SettingsController(IChaosService chaosService, ILogger<SettingsController> logger)
     {
+        _chaosService = chaosService;
         _logger = logger;
     }
 
     [HttpPost("verify-identity")]
-    public IActionResult VerifyIdentity()
+    public async Task<IActionResult> VerifyIdentity()
     {
-        // KYC verification — this endpoint exists as a chaos trigger
-        // (Scenario 6: Dependency Timeout). Normal operation returns success.
         _logger.LogInformation("Identity verification (KYC) requested");
+
+        // Chaos Scenario 6: Dependency Timeout — simulates external KYC provider unreachable
+        await _chaosService.TriggerDependencyTimeout();
+
+        if (_chaosService.GetStatus().IsDependencyTimeoutActive)
+        {
+            _logger.LogError("KYC verification timed out: external identity provider unreachable");
+            return Problem(
+                title: "Identity verification failed",
+                detail: "The identity verification service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status504GatewayTimeout);
+        }
 
         return Ok(new
         {
@@ -31,7 +44,6 @@ public class SettingsController : ControllerBase
     [HttpGet("profile")]
     public IActionResult GetProfile()
     {
-        // Static demo user profile — no actual user model (per spec)
         return Ok(new
         {
             Name = "Alex Johnson",

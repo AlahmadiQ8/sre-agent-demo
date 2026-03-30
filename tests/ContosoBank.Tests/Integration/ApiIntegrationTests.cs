@@ -102,20 +102,25 @@ public class ApiIntegrationTests
     }
 
     [Fact]
-    public async Task PostWireTransfer_Returns201_OnSuccess()
+    public async Task PostWireTransfer_Returns500_WhenChaosHttpErrorsActive()
     {
         var request = new TransferRequest(1, 2, 50m);
         var response = await _client.PostAsJsonAsync("/api/transfers/wire", request);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        // Wire transfer is a chaos trigger (Scenario 3: HTTP 500 Errors)
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Equal("Wire transfer failed", problem.Title);
     }
 
     [Fact]
-    public async Task PostInternationalTransfer_Returns201_OnSuccess()
+    public async Task PostInternationalTransfer_Returns201_WithSlowResponse()
     {
         var request = new TransferRequest(1, 2, 75m);
         var response = await _client.PostAsJsonAsync("/api/transfers/international", request);
 
+        // International transfer triggers slow response chaos but still completes
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
@@ -183,23 +188,29 @@ public class ApiIntegrationTests
     }
 
     [Fact]
-    public async Task PostReconciliation_Returns200()
+    public async Task PostReconciliation_Returns500_WhenChaosExceptionStormActive()
     {
         var response = await _client.PostAsync("/api/reports/reconciliation", null);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("totalAccounts", body, StringComparison.OrdinalIgnoreCase);
+        // Reconciliation is a chaos trigger (Scenario 8: Exception Storm)
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Equal("Reconciliation failed", problem.Title);
     }
 
     // --- Settings ---
 
     [Fact]
-    public async Task PostVerifyIdentity_Returns200()
+    public async Task PostVerifyIdentity_Returns504_WhenChaosDependencyTimeoutActive()
     {
         var response = await _client.PostAsync("/api/settings/verify-identity", null);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Verify identity is a chaos trigger (Scenario 6: Dependency Timeout)
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Equal("Identity verification failed", problem.Title);
     }
 
     [Fact]
