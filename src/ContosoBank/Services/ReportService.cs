@@ -1,4 +1,5 @@
 using ContosoBank.Data;
+using ContosoBank.Metrics;
 using ContosoBank.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,13 @@ public class ReportService : IReportService
 {
     private readonly BankDbContext _db;
     private readonly ILogger<ReportService> _logger;
+    private readonly BankMetrics _metrics;
 
-    public ReportService(BankDbContext db, ILogger<ReportService> logger)
+    public ReportService(BankDbContext db, ILogger<ReportService> logger, BankMetrics metrics)
     {
         _db = db;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<AccountStatement?> GenerateAnnualStatementAsync(int accountId)
@@ -64,6 +67,12 @@ public class ReportService : IReportService
         var totalDebits = transactions
             .Where(t => t.Type == TransactionType.Debit)
             .Sum(t => t.Amount);
+
+        var creditCount = transactions.Count(t => t.Type == TransactionType.Credit);
+        var debitCount = transactions.Count(t => t.Type == TransactionType.Debit);
+
+        _metrics.TransactionsProcessed.Add(creditCount, new KeyValuePair<string, object?>("type", "credit"));
+        _metrics.TransactionsProcessed.Add(debitCount, new KeyValuePair<string, object?>("type", "debit"));
 
         var result = new ReconciliationResult(
             GeneratedAt: DateTime.UtcNow,

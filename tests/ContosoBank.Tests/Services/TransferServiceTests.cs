@@ -1,4 +1,6 @@
+using System.Diagnostics.Metrics;
 using ContosoBank.Data;
+using ContosoBank.Metrics;
 using ContosoBank.Models;
 using ContosoBank.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +22,14 @@ public class TransferServiceTests : IDisposable
         _db = new BankDbContext(options);
         _db.Database.EnsureCreated();
 
-        _service = new TransferService(_db, Mock.Of<ILogger<TransferService>>());
+        _service = new TransferService(_db, Mock.Of<ILogger<TransferService>>(),
+            new BankMetrics(new TestMeterFactory()));
+    }
+
+    private sealed class TestMeterFactory : IMeterFactory
+    {
+        public Meter Create(MeterOptions options) => new(options);
+        public void Dispose() { }
     }
 
     private async Task<(Account from, Account to)> SeedTwoAccounts(decimal fromBalance = 5000m, decimal toBalance = 1000m)

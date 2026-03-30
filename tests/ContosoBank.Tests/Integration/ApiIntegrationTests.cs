@@ -8,7 +8,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace ContosoBank.Tests.Integration;
 
-public class ApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Integration")]
+public class ApiIntegrationTests
 {
     private readonly HttpClient _client;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };

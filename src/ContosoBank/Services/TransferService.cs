@@ -1,4 +1,5 @@
 using ContosoBank.Data;
+using ContosoBank.Metrics;
 using ContosoBank.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,13 @@ public class TransferService : ITransferService
 {
     private readonly BankDbContext _db;
     private readonly ILogger<TransferService> _logger;
+    private readonly BankMetrics _metrics;
 
-    public TransferService(BankDbContext db, ILogger<TransferService> logger)
+    public TransferService(BankDbContext db, ILogger<TransferService> logger, BankMetrics metrics)
     {
         _db = db;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<IEnumerable<Transfer>> GetAllTransfersAsync()
@@ -42,12 +45,14 @@ public class TransferService : ITransferService
         if (request.FromAccountId == request.ToAccountId)
         {
             _logger.LogWarning("Transfer rejected: same source and destination account {AccountId}", request.FromAccountId);
+            _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "failed"));
             return new TransferResult(false, null, "Source and destination accounts must be different.");
         }
 
         if (request.Amount <= 0)
         {
             _logger.LogWarning("Transfer rejected: invalid amount {Amount}", request.Amount);
+            _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "failed"));
             return new TransferResult(false, null, "Transfer amount must be greater than zero.");
         }
 
@@ -55,6 +60,7 @@ public class TransferService : ITransferService
         if (fromAccount is null)
         {
             _logger.LogWarning("Transfer rejected: source account {AccountId} not found", request.FromAccountId);
+            _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "failed"));
             return new TransferResult(false, null, "Source account not found.");
         }
 
@@ -62,6 +68,7 @@ public class TransferService : ITransferService
         if (toAccount is null)
         {
             _logger.LogWarning("Transfer rejected: destination account {AccountId} not found", request.ToAccountId);
+            _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "failed"));
             return new TransferResult(false, null, "Destination account not found.");
         }
 
@@ -69,6 +76,7 @@ public class TransferService : ITransferService
         {
             _logger.LogWarning("Transfer rejected: insufficient funds in account {AccountId}. Balance: {Balance}, Requested: {Amount}",
                 request.FromAccountId, fromAccount.Balance, request.Amount);
+            _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "failed"));
             return new TransferResult(false, null, "Insufficient funds.");
         }
 
@@ -91,6 +99,8 @@ public class TransferService : ITransferService
 
         _logger.LogInformation("Transfer {TransferId} completed: {Amount} from {FromAccount} to {ToAccount}",
             transfer.Id, transfer.Amount, fromAccount.AccountNumber, toAccount.AccountNumber);
+
+        _metrics.TransfersTotal.Add(1, new KeyValuePair<string, object?>("status", "success"));
 
         return new TransferResult(true, transfer, null);
     }

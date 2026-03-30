@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace ContosoBank.Tests.Integration;
 
-public class RazorPageTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("Integration")]
+public class RazorPageTests
 {
     private readonly HttpClient _client;
 
