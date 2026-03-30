@@ -36,6 +36,11 @@
       "sourceType": "github",
       "computedHash": "793bb6453f2a01bd5cd07141949f6475c5e13edec8e9c364939944c898791fe2"
     },
+    "containerize-aspnetcore": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "23f73cb98109f2a56c0b49b5121fc6132a5fddf1fd3bb145db94085f36f7d205"
+    },
     "directory-build-organization": {
       "source": "dotnet/skills",
       "sourceType": "github",
