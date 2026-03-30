@@ -1,43 +1,93 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+    bool IsActive(string page) => currentPage.Equals(page, StringComparison.OrdinalIgnoreCase);
+    string NavClass(string page) => IsActive(page)
+        ? "nav-link active"
+        : "nav-link";
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - ContosoBank</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>@ViewData["Title"] - Contoso Bank</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-    <header class="bg-white border-b shadow-sm">
-        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-            <a class="text-xl font-bold text-blue-900" asp-area="" asp-page="/Index">ContosoBank</a>
-            <button id="mobile-menu-btn" type="button" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100" aria-label="Toggle navigation">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-            </button>
-            <ul id="nav-links" class="hidden sm:flex gap-6">
-                <li><a class="text-gray-700 hover:text-blue-700 font-medium" asp-area="" asp-page="/Index">Home</a></li>
-                <li><a class="text-gray-700 hover:text-blue-700 font-medium" asp-area="" asp-page="/Privacy">Privacy</a></li>
-            </ul>
-        </nav>
-        <ul id="mobile-menu" class="hidden sm:hidden px-4 pb-3 space-y-1">
-            <li><a class="block text-gray-700 hover:text-blue-700 font-medium py-2" asp-area="" asp-page="/Index">Home</a></li>
-            <li><a class="block text-gray-700 hover:text-blue-700 font-medium py-2" asp-area="" asp-page="/Privacy">Privacy</a></li>
-        </ul>
+<body>
+    <!-- Mobile header -->
+    <header class="mobile-header" id="mobile-header">
+        <button id="mobile-menu-btn" type="button" aria-label="Toggle navigation">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+        <span class="mobile-logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6l9-4 9 4v2H3V6zm1 3h16v1H4V9zm1 2h2v7H5v-7zm4 0h2v7H9v-7zm4 0h2v7h-2v-7zm4 0h2v7h-2v-7zM3 19h18v2H3v-2z"/></svg>
+            Contoso Bank
+        </span>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
-        <main role="main">
+    <!-- Sidebar overlay for mobile -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Sidebar navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6l9-4 9 4v2H3V6zm1 3h16v1H4V9zm1 2h2v7H5v-7zm4 0h2v7H9v-7zm4 0h2v7h-2v-7zm4 0h2v7h-2v-7zM3 19h18v2H3v-2z"/></svg>
+            <span>Contoso Bank</span>
+        </div>
+        <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+            <a class="@NavClass("/Index")" asp-page="/Index">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                Dashboard
+            </a>
+            <a class="@NavClass("/Accounts")" asp-page="/Accounts">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                Accounts
+            </a>
+            <a class="@NavClass("/Transfers")" asp-page="/Transfers">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l-4-4 4-4M17 7l4 4-4 4M3 13h18M21 11H3"/></svg>
+                Transfers
+            </a>
+            <a class="@NavClass("/Transactions")" asp-page="/Transactions">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/><path d="M9 14l2 2 4-4"/></svg>
+                Transactions
+            </a>
+            <a class="@NavClass("/Reports")" asp-page="/Reports">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19V13a1 1 0 011-1h4a1 1 0 011 1v6M4 19h16M4 19V6a2 2 0 012-2h12a2 2 0 012 2v13"/><path d="M8 9h2M8 13h2"/></svg>
+                Reports
+            </a>
+            <a class="@NavClass("/Settings")" asp-page="/Settings">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                Settings
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">JD</div>
+                <div>
+                    <div class="user-name">Jane Doe</div>
+                    <div class="user-role">Personal Banking</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="main-wrapper">
+        <header class="top-bar">
+            <h1 class="page-title">@ViewData["Title"]</h1>
+            <div class="top-bar-right">
+                <span class="env-badge">Demo Environment</span>
+            </div>
+        </header>
+        <main class="content" role="main">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-t bg-white text-gray-500 text-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            &copy; 2026 - ContosoBank - <a class="text-blue-700 hover:underline" asp-area="" asp-page="/Privacy">Privacy</a>
-        </div>
-    </footer>
+    <!-- Toast container -->
+    <div id="toast-container" aria-live="polite"></div>
 
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)

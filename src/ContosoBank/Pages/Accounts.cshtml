@@ -1,0 +1,17 @@
+@page
+@model ContosoBank.Pages.AccountsModel
+@{
+    ViewData["Title"] = "Accounts";
+}
+
+<div class="section-header">
+    <h2 class="section-title">Your Accounts</h2>
+    <button class="btn btn-secondary" id="btn-refresh-accounts" type="button">
+        <span class="spinner"></span>
+        <span class="btn-text">Refresh</span>
+    </button>
+</div>
+
+<div class="stats-grid" id="accounts-list">
+    <div class="account-card"><div class="stat-label">Loading accounts...</div></div>
+</div>

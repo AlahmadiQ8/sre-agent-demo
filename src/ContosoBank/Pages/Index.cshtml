@@ -1,10 +1,75 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-    <h1 class="text-4xl font-bold text-gray-900">Welcome</h1>
-    <p class="mt-4 text-gray-600">Learn about <a class="text-blue-700 hover:underline" href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<!-- Stats -->
+<div class="stats-grid" id="dashboard-stats">
+    <div class="stat-card"><div class="stat-label">Loading...</div></div>
+</div>
+
+<div class="grid-2">
+    <!-- Accounts Overview -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Accounts</h2>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr><th>Account</th><th>Type</th><th>Balance</th></tr>
+            </thead>
+            <tbody id="dashboard-accounts">
+                <tr><td colspan="3" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Recent Transactions</h2>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th></tr>
+            </thead>
+            <tbody id="dashboard-transactions">
+                <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="margin-top: 28px;">
+    <div class="section-header">
+        <h2 class="section-title">Quick Actions</h2>
+    </div>
+    <div class="actions-grid">
+        <div class="action-card" onclick="window.location='/Transfers'">
+            <div class="action-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l-4-4 4-4M17 7l4 4-4 4M3 13h18M21 11H3"/></svg>
+            </div>
+            <span class="action-label">New Transfer</span>
+        </div>
+        <div class="action-card" onclick="window.location='/Transactions'">
+            <div class="action-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </div>
+            <span class="action-label">View Transactions</span>
+        </div>
+        <div class="action-card" onclick="window.location='/Reports'">
+            <div class="action-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19V13a1 1 0 011-1h4a1 1 0 011 1v6M4 19h16M4 19V6a2 2 0 012-2h12a2 2 0 012 2v13"/></svg>
+            </div>
+            <span class="action-label">Generate Report</span>
+        </div>
+        <button class="action-card" id="btn-fraud-detection" type="button">
+            <div class="action-icon" style="background:var(--color-red-50);color:var(--color-red-500)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <span class="action-label">Run Fraud Detection</span>
+        </button>
+    </div>
 </div>

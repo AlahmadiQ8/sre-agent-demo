@@ -1,0 +1,77 @@
+@page
+@model ContosoBank.Pages.SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<div class="section-header">
+    <h2 class="section-title">Account Settings</h2>
+</div>
+
+<div class="grid-2">
+    <!-- Profile Information -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Profile Information</h2>
+        </div>
+        <div id="profile-data">
+            <div class="settings-row"><span class="settings-label">Loading...</span></div>
+        </div>
+    </div>
+
+    <!-- Security -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Security & Verification</h2>
+        </div>
+        <p style="font-size:.875rem;color:var(--color-gray-600);margin-bottom:20px;">
+            Verify your identity to enable enhanced security features including higher transfer limits and priority support.
+        </p>
+        <div style="padding:14px;background:var(--color-blue-50);border-radius:var(--radius);margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-blue-500)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <strong style="font-size:.85rem;color:var(--color-blue-600);">KYC Verification</strong>
+            </div>
+            <p style="font-size:.8rem;color:var(--color-gray-600);">Our verification service connects to external identity providers to validate your information.</p>
+        </div>
+        <button class="btn btn-primary" id="btn-verify-identity" type="button">
+            <span class="spinner"></span>
+            <span class="btn-text">Verify Identity (KYC)</span>
+        </button>
+    </div>
+</div>
+
+<!-- Notification Preferences -->
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        <h2 class="card-title">Notification Preferences</h2>
+    </div>
+    <div class="settings-row">
+        <div>
+            <span class="settings-label">Transaction Alerts</span>
+            <div style="font-size:.75rem;color:var(--color-gray-500);">Receive notifications for all account transactions</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row">
+        <div>
+            <span class="settings-label">Security Alerts</span>
+            <div style="font-size:.75rem;color:var(--color-gray-500);">Get notified about login attempts and security events</div>
+        </div>
+        <label class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row">
+        <div>
+            <span class="settings-label">Monthly Statements</span>
+            <div style="font-size:.75rem;color:var(--color-gray-500);">Receive monthly account statement summaries via email</div>
+        </div>
+        <label class="toggle"><input type="checkbox" /><span class="toggle-slider"></span></label>
+    </div>
+    <div class="settings-row">
+        <div>
+            <span class="settings-label">Marketing Communications</span>
+            <div style="font-size:.75rem;color:var(--color-gray-500);">Product updates, offers, and financial tips</div>
+        </div>
+        <label class="toggle"><input type="checkbox" /><span class="toggle-slider"></span></label>
+    </div>
+</div>

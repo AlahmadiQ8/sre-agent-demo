@@ -1,0 +1,80 @@
+@page
+@model ContosoBank.Pages.TransfersModel
+@{
+    ViewData["Title"] = "Transfers";
+}
+
+<div class="grid-2">
+    <!-- Transfer Form -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">New Transfer</h2>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="transfer-from">From Account</label>
+            <select class="form-select" id="transfer-from">
+                <option value="">Loading accounts...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="transfer-to">To Account</label>
+            <select class="form-select" id="transfer-to">
+                <option value="">Loading accounts...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="transfer-amount">Amount (USD)</label>
+            <input class="form-input" type="number" id="transfer-amount" min="0.01" step="0.01" placeholder="0.00" />
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="btn-transfer" type="button">
+                <span class="spinner"></span>
+                <span class="btn-text">Transfer</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-wire-transfer" type="button">
+                <span class="spinner"></span>
+                <span class="btn-text">Process Wire Transfer</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-international-transfer" type="button">
+                <span class="spinner"></span>
+                <span class="btn-text">International Transfer</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Transfer Info -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Transfer Options</h2>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="padding:16px;background:var(--color-blue-50);border-radius:var(--radius);border-left:3px solid var(--color-blue-500);">
+                <strong style="font-size:.9rem;">Standard Transfer</strong>
+                <p style="font-size:.8rem;color:var(--color-gray-600);margin-top:4px;">Transfer between your accounts. Processed instantly with no fees.</p>
+            </div>
+            <div style="padding:16px;background:var(--color-amber-50);border-radius:var(--radius);border-left:3px solid var(--color-amber-500);">
+                <strong style="font-size:.9rem;">Wire Transfer</strong>
+                <p style="font-size:.8rem;color:var(--color-gray-600);margin-top:4px;">Domestic wire transfer via the Federal Reserve. Processing takes 1–2 business days. Fee: $25.00.</p>
+            </div>
+            <div style="padding:16px;background:var(--color-green-50);border-radius:var(--radius);border-left:3px solid var(--color-green-500);">
+                <strong style="font-size:.9rem;">International Transfer</strong>
+                <p style="font-size:.8rem;color:var(--color-gray-600);margin-top:4px;">SWIFT network transfer to international banks. Processing takes 3–5 business days. Fee: $45.00.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transfers -->
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        <h2 class="card-title">Recent Transfers</h2>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr><th>ID</th><th>Route</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+        </thead>
+        <tbody id="transfers-list">
+            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>

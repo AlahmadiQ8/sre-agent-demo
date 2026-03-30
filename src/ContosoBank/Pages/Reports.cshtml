@@ -1,0 +1,59 @@
+@page
+@model ContosoBank.Pages.ReportsModel
+@{
+    ViewData["Title"] = "Reports";
+}
+
+<div class="section-header">
+    <h2 class="section-title">Reports & Statements</h2>
+</div>
+
+<div class="grid-2">
+    <!-- Annual Statement -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Annual Statement</h2>
+        </div>
+        <p style="font-size:.875rem;color:var(--color-gray-600);margin-bottom:20px;">
+            Generate a comprehensive annual statement for a selected account, including all transactions, balances, and account activity.
+        </p>
+        <div class="form-group">
+            <label class="form-label" for="report-account">Account</label>
+            <select class="form-select" id="report-account">
+                <option value="">Loading accounts...</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="btn-annual-statement" type="button">
+            <span class="spinner"></span>
+            <span class="btn-text">Generate Annual Statement</span>
+        </button>
+    </div>
+
+    <!-- Batch Reconciliation -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Batch Reconciliation</h2>
+        </div>
+        <p style="font-size:.875rem;color:var(--color-gray-600);margin-bottom:20px;">
+            Run a batch reconciliation process across all accounts. Compares internal records with external sources to identify discrepancies.
+        </p>
+        <div style="padding:14px;background:var(--color-amber-50);border-radius:var(--radius);margin-bottom:20px;font-size:.8rem;color:#92400e;">
+            <strong>Note:</strong> This process may take several minutes to complete. All accounts will be scanned.
+        </div>
+        <button class="btn btn-primary" id="btn-reconciliation" type="button">
+            <span class="spinner"></span>
+            <span class="btn-text">Run Batch Reconciliation</span>
+        </button>
+    </div>
+</div>
+
+<!-- Report History -->
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        <h2 class="card-title">Recent Reports</h2>
+    </div>
+    <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <p>No reports generated yet. Select a report type above to get started.</p>
+    </div>
+</div>
