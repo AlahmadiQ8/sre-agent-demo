@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "appinsights-instrumentation": {
+      "source": "microsoft/azure-skills",
+      "sourceType": "github",
+      "computedHash": "3ddf71098d9bd57c67b551fff1edbfe7a80ebebf0f47745e096cfae386639144"
+    },
     "azure-deploy": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
