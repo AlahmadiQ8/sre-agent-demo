@@ -680,19 +680,37 @@ During implementation, leverage the following Copilot skills and tools for maxim
 
 ### Playwright UI Testing Strategy
 
-Use the `playwright-cli` skill for end-to-end validation:
+Testing is embedded in every phase — not deferred to the end. Use the `playwright-cli` skill for progressive UI validation:
 
+**Phase 2 (after building pages):**
 1. **Page Load Tests** — Verify each Razor Page loads without errors (Dashboard, Accounts, Transfers, Transactions, Reports, Settings)
 2. **Navigation Tests** — Verify sidebar navigation works, active page highlighting
-3. **Chaos Button Tests** — Click each chaos-trigger button, verify:
+3. **Content Tests** — Headings, tables, forms render correctly
+
+**Phase 4 (after wiring chaos):**
+4. **Chaos Button Tests** — Click each chaos-trigger button, verify:
    - The UI shows appropriate loading/error state
    - The correct API endpoint is called
    - Error messages display gracefully (no raw stack traces)
-4. **Responsive Design** — Verify layout works on desktop and tablet viewports
-5. **Accessibility** — Basic a11y checks (heading hierarchy, form labels, color contrast)
-6. **Visual Regression** — Screenshot comparisons for the banking theme consistency
 
-Playwright is configured in `.playwright/cli.config.json` to use Chromium/Edge.
+**Phase 7 (final validation):**
+5. **Responsive Design** — Verify layout works on desktop and tablet viewports
+6. **Accessibility** — Basic a11y checks (heading hierarchy, form labels, color contrast)
+7. **Visual Regression** — Screenshot gallery of all pages in healthy state
+
+### Testing Approach: Shift-Left
+
+Every phase includes its own tests (`#t` suffix tasks). The pattern:
+
+| Phase | What's Built | What's Tested | Tool |
+|-------|-------------|---------------|------|
+| 1 | Models + DbContext | EF Core InMemory integration | `run-tests` |
+| 2 | Services + Controllers + UI | Unit tests (mocked deps), API integration tests (`WebApplicationFactory`), Playwright page load | `run-tests` + `playwright-cli` |
+| 3 | OTel + Metrics | `/metrics` endpoint scraping, metric label verification | `run-tests` |
+| 4 | ChaosService + wiring | Chaos activation/deactivation, auto-recovery, UI error states | `run-tests` + `playwright-cli` |
+| 5 | Dockerfile + Bicep | Docker build, `az bicep build`, template validation | `docker` + `azure-validate` |
+| 6 | Grafana dashboards | JSON schema validation | Script/test |
+| 7 | Full E2E | Complete Playwright sweep of all pages + chaos buttons | `playwright-cli` |
 
 ---
 
@@ -702,16 +720,20 @@ Playwright is configured in `.playwright/cli.config.json` to use Chromium/Edge.
 
 | # | Task | Description |
 |---|------|-------------|
-| 1 | **Scaffold .NET 8 project** | `dotnet new webapp` in `src/ContosoBank/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore`, `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`. Configure `ContosoBank.csproj`. |
+| 1 | **Scaffold .NET 8 project + test project** | `dotnet new webapp` in `src/ContosoBank/`. `dotnet new xunit` in `tests/ContosoBank.Tests/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore`, `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`. Test project gets: `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.EntityFrameworkCore.InMemory`, `Moq`. Verify both projects build. Use `run-tests` skill to confirm test runner works. |
 | 2 | **Create data models + DbContext** | `Account.cs`, `Transaction.cs`, `Transfer.cs` in `Models/`. `BankDbContext.cs` with EF Core configuration, indexes, and relationships. `SeedData.cs` for initial demo data. |
+| 2t | **Test: data layer** | Unit tests for model validation and seed data. Integration test with EF Core InMemory provider verifying DbContext creates tables, seeds data, and enforces FK constraints. Use `run-tests` skill. |
 
 ### Phase 2: Core Application (depends on Phase 1)
 
 | # | Task | Description |
 |---|------|-------------|
-| 3 | **Build Razor Pages banking UI** | Professional banking theme with sidebar nav. Pages: Dashboard (`Index.cshtml`), Accounts, Transfers, Transactions, Reports, Settings. Dark blue/white color scheme. Each page includes the natural-looking buttons that will trigger chaos scenarios. Mobile-friendly layout. |
-| 4 | **Implement API controllers** | `AccountsController`, `TransfersController`, `TransactionsController`, `ReportsController`, `SettingsController`, `HealthController`. Full CRUD operations against EF Core. Proper HTTP status codes and error handling. |
-| 5 | **Implement service layer** | `AccountService`, `TransferService`, `TransactionService`, `ReportService`. Business logic separated from controllers. Inject `ILogger<T>` and `BankMetrics` for structured logging and metrics. |
+| 3 | **Implement service layer** | `AccountService`, `TransferService`, `TransactionService`, `ReportService`. Business logic separated from controllers. Inject `ILogger<T>` for structured logging. |
+| 3t | **Test: service layer** | Unit tests for each service with mocked DbContext. Test: accounts CRUD, transfer validation (insufficient funds, same-account), transaction queries. Use `run-tests` skill. |
+| 4 | **Implement API controllers** | `AccountsController`, `TransfersController`, `TransactionsController`, `ReportsController`, `SettingsController`, `HealthController`. Full CRUD operations against services. Proper HTTP status codes and error handling. |
+| 4t | **Test: API controllers** | Unit tests with mocked services. Integration tests with `WebApplicationFactory` + InMemory DB: verify each endpoint returns correct status codes, response shapes, and error handling. Test `/health` endpoint. Use `run-tests` skill. |
+| 5 | **Build Razor Pages banking UI** | Professional banking theme with sidebar nav. Pages: Dashboard (`Index.cshtml`), Accounts, Transfers, Transactions, Reports, Settings. Dark blue/white color scheme. Each page includes the natural-looking buttons that will trigger chaos scenarios. Mobile-friendly layout. |
+| 5t | **Test: UI pages with Playwright** | Use `playwright-cli` skill to verify: all 6 pages load without errors, sidebar navigation works with active page highlighting, page content renders (headings, tables, forms). Screenshot each page for visual verification. |
 
 ### Phase 3: Observability (depends on Phase 1)
 
@@ -719,42 +741,42 @@ Playwright is configured in `.playwright/cli.config.json` to use Chromium/Edge.
 |---|------|-------------|
 | 6 | **Configure OpenTelemetry pipeline** | Wire up `AddOpenTelemetry()` in `Program.cs` with tracing (ASP.NET Core, HttpClient, SqlClient, custom source), metrics (ASP.NET Core, Runtime, Process, custom meter, Prometheus exporter), and `UseAzureMonitor()`. Map `/metrics` endpoint. |
 | 7 | **Create BankMetrics class** | `Metrics/BankMetrics.cs` using `System.Diagnostics.Metrics`. Register as singleton in DI. Instrument all service methods to record business and reliability metrics. |
+| 7t | **Test: metrics + /metrics endpoint** | Integration test: call API endpoints via `WebApplicationFactory`, then scrape `/metrics` and assert custom `contosobank_*` metrics appear with correct labels. Verify Prometheus text format is valid. Use `run-tests` skill. |
 
 ### Phase 4: Chaos Engineering (depends on Phase 2 + Phase 3)
 
 | # | Task | Description |
 |---|------|-------------|
 | 8 | **Build ChaosService** | `Services/ChaosService.cs` — singleton implementing all 8 failure scenarios. Each method: activates failure, auto-recovers after configurable duration, logs activation at Warning level, increments chaos-specific metrics. Thread-safe with `ConcurrentDictionary` for active scenario tracking. |
+| 8t | **Test: ChaosService** | Unit tests for each scenario: verify activation sets status, auto-recovery resets status after duration, concurrent activation is thread-safe, metrics increment on activation. Test with short durations (1 second) so tests run fast. Use `run-tests` skill. |
 | 9 | **Wire chaos into controllers** | Map each chaos trigger to a natural controller action. The controller methods look like normal banking operations but call `IChaosService` methods. Ensure graceful error handling — user sees a realistic banking error, not a raw stack trace. |
+| 9t | **Test: chaos integration (API + UI)** | Integration tests: trigger each chaos endpoint, verify correct HTTP error response (not raw stack traces). Use `playwright-cli` skill: click each chaos-trigger button in the UI, verify loading states display, error messages are user-friendly, and the app doesn't crash. |
 
-### Phase 5: Containerization (depends on Phase 2)
+### Phase 5: Containerization + Infra (depends on Phase 4)
 
 | # | Task | Description |
 |---|------|-------------|
 | 10 | **Create Dockerfile** | Multi-stage Dockerfile: `mcr.microsoft.com/dotnet/sdk:8.0` for build, `mcr.microsoft.com/dotnet/aspnet:8.0` for runtime. Expose port 8080. Set `ASPNETCORE_URLS`. Health check instruction. Optimize layer caching (copy `.csproj` first, then `dotnet restore`, then copy source). |
-
-### Phase 6: Infrastructure (depends on Phase 5)
-
-| # | Task | Description |
-|---|------|-------------|
+| 10t | **Test: Docker build** | Verify `docker build` succeeds, container starts, health endpoint responds. Test locally with `docker run`. |
 | 11 | **Write Bicep IaC modules** | All modules in `infra/modules/`: `container-env.bicep`, `container-app.bicep`, `sql.bicep`, `monitoring.bicep`, `prometheus.bicep`, `grafana.bicep`, `alerts.bicep`, `identity.bicep`. Entry point `main.bicep` orchestrating all modules. `main.bicepparam` with sensible defaults. |
+| 11t | **Test: Bicep validation** | Run `az bicep build` and `az deployment group validate` (or `what-if`) to verify templates are syntactically correct and parameters resolve. Use `azure-validate` skill. |
 | 12 | **Create azd configuration** | `azure.yaml` defining the project, services, and hooks. Post-provision hook pointing to `scripts/post-provision.sh`. Environment variable mapping for connection strings and instrumentation keys. |
 
-### Phase 7: Dashboards + Automation (depends on Phase 6)
+### Phase 6: Dashboards + Automation (depends on Phase 5)
 
 | # | Task | Description |
 |---|------|-------------|
 | 13 | **Build Grafana dashboard JSONs** | 4 dashboards in `grafana/dashboards/`: Overview, Infrastructure, Database, Business. Each with PromQL queries targeting `contosobank_*` and `process_*` metrics. Variable templates for environment filtering. 15-minute default time range. |
+| 13t | **Test: dashboard JSON validity** | Validate each JSON file parses correctly and contains required Grafana schema fields (`panels`, `title`, `templating`, `time`). Script or unit test. |
 | 14 | **Write database seed script** | `scripts/seed-data.sql` — realistic banking data: 5 accounts (2 checking, 1 savings, 1 credit, 1 business), 100+ transactions across 30 days, 10+ recent transfers. |
 | 15 | **Write post-provision script** | `scripts/post-provision.sh` — runs after `azd provision`: executes SQL seed script, configures Grafana data sources via API, imports dashboard JSONs, outputs Grafana MCP URL. |
 
-### Phase 8: Testing + Documentation (depends on all above)
+### Phase 7: Documentation + Final Validation
 
 | # | Task | Description |
 |---|------|-------------|
-| 16 | **UI testing with Playwright** | Use the `playwright-cli` skill to validate: all pages load, navigation works, chaos buttons trigger correctly, error states display gracefully, responsive layout, basic accessibility. |
-| 17 | **Write unit + integration tests** | Controller tests (mock services), service tests (mock DbContext), integration tests with `WebApplicationFactory`. Verify chaos scenarios activate/deactivate correctly. Use `run-tests` skill. |
-| 18 | **Write README** | User-facing documentation: prerequisites, one-command deployment, SRE Agent connector setup guide, demo walkthrough for each scenario, troubleshooting, cleanup. |
+| 16 | **Write README** | User-facing documentation: prerequisites, one-command deployment, SRE Agent connector setup guide, demo walkthrough for each scenario, troubleshooting, cleanup. |
+| 17 | **End-to-end validation with Playwright** | Use `playwright-cli` skill for full E2E sweep: navigate every page, trigger every chaos button, verify error states, check responsive layout on desktop + tablet, basic accessibility (heading hierarchy, form labels). Final screenshot gallery of all pages in healthy state. |
 
 ---
 
