@@ -21,7 +21,7 @@ Unlike existing Microsoft samples (Grubify/Octopets) which use CLI scripts to in
 | Layer | Technology | Azure Service |
 |-------|-----------|---------------|
 | Frontend | ASP.NET Core Razor Pages (HTML/CSS/JS) | — |
-| Backend | ASP.NET Core Web API (C# / .NET 8) | Azure Container Apps |
+| Backend | ASP.NET Core Web API (C# / .NET 10) | Azure Container Apps |
 | Database | Entity Framework Core | Azure SQL Database |
 | Observability | OpenTelemetry SDK (unified logs, metrics, traces) | — |
 | Traces + Logs | Azure Monitor OpenTelemetry exporter | App Insights + Log Analytics |
@@ -218,7 +218,7 @@ Each scenario is triggered by a normal-looking banking action. The user clicks a
 
 ## Observability: OpenTelemetry Unified Pipeline
 
-The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs, metrics, traces), with dual export to Azure Monitor and Prometheus. This avoids duplicate metric definitions and aligns with Microsoft's recommended .NET 8 approach.
+The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs, metrics, traces), with dual export to Azure Monitor and Prometheus. This avoids duplicate metric definitions and aligns with Microsoft's recommended .NET approach.
 
 ### NuGet Packages
 
@@ -270,7 +270,7 @@ app.MapPrometheusScrapingEndpoint();          // exposes /metrics
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          .NET 8 App (OpenTelemetry SDK)                  │
+│                          .NET 10 App (OpenTelemetry SDK)                  │
 │                                                                          │
 │  ILogger<T> ──────┐    System.Diagnostics.Metrics ──┐   ActivitySource ─┐│
 │  (structured logs) │    (custom Meter "ContosoBank") │   (custom spans)  ││
@@ -620,7 +620,7 @@ contoso-bank/
 │       └── identity.bicep              # Managed Identity + RBAC assignments
 ├── src/
 │   └── ContosoBank/
-│       ├── ContosoBank.csproj          # .NET 8 project with OTel + EF Core packages
+│       ├── ContosoBank.csproj          # .NET 10 project with OTel + EF Core packages
 │       ├── Program.cs                  # App startup, DI, OTel pipeline, middleware
 │       ├── appsettings.json            # Config (connection strings, feature flags)
 │       ├── appsettings.Development.json
@@ -714,7 +714,7 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 
 | # | Task | Description |
 |---|------|-------------|
-| 1 | **Scaffold .NET 8 project + test project** | `dotnet new webapp` in `src/ContosoBank/`. `dotnet new xunit` in `tests/ContosoBank.Tests/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore` (prerelease: `--prerelease`), `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`. Test project gets: `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.EntityFrameworkCore.InMemory`, `Moq`. Verify both projects build and test runner works. |
+| 1 | **Scaffold .NET 10 project + test project** | `dotnet new webapp` in `src/ContosoBank/`. `dotnet new xunit` in `tests/ContosoBank.Tests/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore` (prerelease: `--prerelease`), `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`. Test project gets: `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.EntityFrameworkCore.InMemory`, `Moq`. Verify both projects build and test runner works. |
 | 2 | **Create data models + DbContext** | `Account.cs`, `Transaction.cs`, `Transfer.cs` in `Models/`. `BankDbContext.cs` with EF Core configuration, indexes, and relationships. `SeedData.cs` for initial demo data. |
 | 2t | **Test: data layer** | Unit tests for model validation and seed data. Integration test with EF Core InMemory provider verifying DbContext creates tables, seeds data, and enforces FK constraints. |
 
@@ -750,7 +750,7 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 
 | # | Task | Description |
 |---|------|-------------|
-| 10 | **Create Dockerfile** | Multi-stage Dockerfile: `mcr.microsoft.com/dotnet/sdk:8.0` for build, `mcr.microsoft.com/dotnet/aspnet:8.0` for runtime. Expose port 8080. Set `ASPNETCORE_URLS`. Health check instruction. Optimize layer caching (copy `.csproj` first, then `dotnet restore`, then copy source). |
+| 10 | **Create Dockerfile** | Multi-stage Dockerfile: `mcr.microsoft.com/dotnet/sdk:10.0` for build, `mcr.microsoft.com/dotnet/aspnet:10.0` for runtime. Expose port 8080. Set `ASPNETCORE_URLS`. Health check instruction. Optimize layer caching (copy `.csproj` first, then `dotnet restore`, then copy source). |
 | 10t | **Test: Docker build** | Verify `docker build` succeeds, container starts, health endpoint responds. Test locally with `docker run`. |
 | 11 | **Write Bicep IaC modules** | All modules in `infra/modules/`: `container-env.bicep`, `container-app.bicep`, `sql.bicep`, `monitoring.bicep`, `prometheus.bicep`, `grafana.bicep`, `alerts.bicep`, `identity.bicep`. Entry point `main.bicep` orchestrating all modules. `main.bicepparam` with sensible defaults. |
 | 11t | **Test: Bicep validation** | Run `az bicep build` and `az deployment group validate` (or `what-if`) to verify templates are syntactically correct and parameters resolve. |
