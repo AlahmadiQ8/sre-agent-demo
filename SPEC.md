@@ -69,14 +69,32 @@ Unlike existing Microsoft samples (Grubify/Octopets) which use CLI scripts to in
 
 ## Banking Features (The "Real" App)
 
-The app has enough real functionality to look convincing during a demo:
+The app has enough real functionality to look convincing during a demo. There is **no authentication** — the app operates as a single demo user with pre-seeded data.
 
 1. **Dashboard** — Account overview with balance, recent transactions, quick actions
 2. **Accounts** — List of bank accounts (checking, savings, credit) with balances
-3. **Transfers** — Transfer money between accounts or to external accounts
+3. **Transfers** — Transfer money between internal accounts (wire transfer and international transfer buttons exist as chaos triggers but use the same internal transfer model)
 4. **Transactions** — Transaction history with search/filter
 5. **Reports** — Generate account statements and reports
-6. **Settings** — Profile and notification preferences
+6. **Settings** — Profile and notification preferences (cosmetic — displays static demo user profile, no actual user model)
+
+### Frontend ↔ Backend Interaction Pattern
+
+Razor Pages serve as the HTML shell (server-side rendered). All dynamic interactions use **AJAX calls from `site.js`** to the API controllers:
+
+- **PageModels** (`*.cshtml.cs`) are minimal — they render the initial page HTML with no data fetching.
+- **`site.js`** uses `fetch()` to call API controllers (`/api/accounts`, `/api/transfers`, etc.) and updates the DOM dynamically.
+- Chaos-trigger buttons call API endpoints via AJAX, showing loading spinners and toast notifications for results/errors.
+- This pattern avoids page reloads during demos and keeps the API controllers as the single source of truth.
+
+### Local Development
+
+For local development without Azure SQL:
+
+- `appsettings.Development.json` configures **EF Core InMemory provider** as the database (auto-seeded with `SeedData.cs`).
+- `Program.cs` detects the `Development` environment and switches from SQL Server to InMemory provider.
+- All Azure Monitor/App Insights telemetry gracefully degrades — OTel SDK logs a warning but doesn't crash.
+- The `/metrics` Prometheus endpoint works locally for testing dashboards.
 
 ### Data Model
 
@@ -152,7 +170,7 @@ Each scenario is triggered by a normal-looking banking action. The user clicks a
 |--------|--------|
 | **User Action** | Click "Refresh" on Account Balance |
 | **What User Sees** | "Unable to load account information" error |
-| **What Happens** | Temporarily swaps the EF Core connection string to an invalid one (wrong password or non-existent server). All DB queries fail. Reverts after 5 minutes. |
+| **What Happens** | Uses an EF Core `DbConnectionInterceptor` that ChaosService toggles. When active, the interceptor throws `SqlException` on `ConnectionOpening`, simulating a database outage. All DB queries fail. Auto-reverts after 5 minutes. |
 | **Telemetry Signals** | `SqlException` flood in App Insights, dependency failure metrics, Prometheus `contosobank_db_errors_total` counter spike |
 | **SRE Agent Finds** | Database connectivity failure, SQL error codes, dependency map showing all DB calls failing, connection string issue |
 
@@ -208,17 +226,26 @@ The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs
 <!-- OpenTelemetry Core + Azure Monitor -->
 <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
 
-<!-- Prometheus /metrics endpoint -->
-<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" />
+<!-- Prometheus /metrics endpoint (prerelease — no stable version available) -->
+<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.1-beta.1" />
 
 <!-- Auto-instrumentation -->
 <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
 <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
 ```
 
+> **Note:** `OpenTelemetry.Exporter.Prometheus.AspNetCore` has no stable release. Install with `dotnet add package OpenTelemetry.Exporter.Prometheus.AspNetCore --prerelease`. This is acceptable for a demo application. The alternative (OTLP exporter → OTel Collector → Prometheus) is more complex but production-stable.
+
 ### Program.cs Wiring
 
 ```csharp
+// Error handling — RFC 7807 ProblemDetails for all API errors
+builder.Services.AddProblemDetails();
+
+// Health checks — used by Container Apps probes
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<BankDbContext>();       // readiness: DB connectivity
+
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(r => r.AddService("contoso-bank"))
     .WithTracing(tracing => tracing
@@ -234,6 +261,8 @@ builder.Services.AddOpenTelemetry()
         .AddPrometheusExporter())             // /metrics endpoint for Grafana
     .UseAzureMonitor();                       // → App Insights + Log Analytics
 
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }); // liveness: always 200
+app.MapHealthChecks("/health/ready");         // readiness: checks DB connectivity
 app.MapPrometheusScrapingEndpoint();          // exposes /metrics
 ```
 
@@ -503,17 +532,44 @@ The `ChaosService` is registered as a singleton in DI. It provides methods that 
 ```csharp
 public interface IChaosService
 {
-    Task TriggerMemoryLeak(CancellationToken ct);
-    Task TriggerCpuSpike(CancellationToken ct);
-    void TriggerHttpErrors(TimeSpan duration);
-    void TriggerDbConnectionFailure(TimeSpan duration);
-    void TriggerSlowResponses(TimeSpan duration);
-    Task TriggerDependencyTimeout(CancellationToken ct);
-    Task TriggerLogFlooding(CancellationToken ct);
-    Task TriggerExceptionStorm(CancellationToken ct);
+    // All methods accept optional duration (default: 5 minutes) and return Task.
+    // Flag-based scenarios (HttpErrors, DbFailure, SlowResponses) set an in-memory flag and
+    // schedule auto-recovery. Work-based scenarios (MemoryLeak, CpuSpike, etc.) run background
+    // work that stops after the duration elapses or when the CancellationToken is triggered.
+
+    Task TriggerMemoryLeak(TimeSpan? duration = null, CancellationToken ct = default);
+    Task TriggerCpuSpike(TimeSpan? duration = null, CancellationToken ct = default);
+    Task TriggerHttpErrors(TimeSpan? duration = null);
+    Task TriggerDbConnectionFailure(TimeSpan? duration = null);
+    Task TriggerSlowResponses(TimeSpan? duration = null);
+    Task TriggerDependencyTimeout(TimeSpan? duration = null, CancellationToken ct = default);
+    Task TriggerLogFlooding(TimeSpan? duration = null, CancellationToken ct = default);
+    Task TriggerExceptionStorm(TimeSpan? duration = null, CancellationToken ct = default);
     ChaosStatus GetStatus();  // Returns which failures are currently active
 }
 ```
+
+### Database Connection Failure Implementation
+
+Scenario 4 uses an EF Core `DbConnectionInterceptor` rather than connection string swapping (which doesn't work with DI-registered DbContext):
+
+```csharp
+public class ChaosDbInterceptor : DbConnectionInterceptor
+{
+    private readonly IChaosService _chaos;
+
+    public override ValueTask<InterceptionResult> ConnectionOpeningAsync(
+        DbConnection connection, ConnectionEventData eventData,
+        InterceptionResult result, CancellationToken ct)
+    {
+        if (_chaos.GetStatus().IsDbFailureActive)
+            throw new InvalidOperationException("Database connection failed (simulated outage)");
+        return base.ConnectionOpeningAsync(connection, eventData, result, ct);
+    }
+}
+```
+
+Register in `Program.cs`: `builder.Services.AddDbContext<BankDbContext>(o => o.AddInterceptors(chaosInterceptor));`
 
 ---
 
@@ -588,8 +644,7 @@ contoso-bank/
 │       │   ├── TransfersController.cs  # POST /api/transfers, POST /api/transfers/wire
 │       │   ├── TransactionsController.cs # GET /api/transactions
 │       │   ├── ReportsController.cs    # POST /api/reports/annual-statement, POST /api/reports/reconciliation
-│       │   ├── SettingsController.cs   # POST /api/settings/verify-identity
-│       │   └── HealthController.cs     # GET /health, GET /health/ready
+│       │   └── SettingsController.cs   # POST /api/settings/verify-identity
 │       ├── Pages/
 │       │   ├── _Layout.cshtml          # Banking UI shell (sidebar nav, header, footer)
 │       │   ├── _Layout.cshtml.cs
@@ -613,6 +668,8 @@ contoso-bank/
 │       │   ├── favicon.ico
 │       │   └── images/
 │       │       └── logo.svg            # Contoso Bank logo
+│       ├── Interceptors/
+│       │   └── ChaosDbInterceptor.cs   # EF Core interceptor for DB failure chaos scenario
 │       └── Metrics/
 │           └── BankMetrics.cs          # Custom System.Diagnostics.Metrics definitions
 ├── tests/
@@ -630,10 +687,9 @@ contoso-bank/
 │       ├── infrastructure.json         # Infrastructure Health dashboard
 │       ├── database.json               # Database Performance dashboard
 │       └── business.json               # Business Metrics dashboard
-└── .github/
-    └── workflows/
-        └── ci.yml                      # Build + test CI pipeline
 ```
+
+> **Note:** CI/CD pipeline (`.github/workflows/`) will be added in a later phase, not part of initial implementation.
 
 ---
 
@@ -720,7 +776,7 @@ Every phase includes its own tests (`#t` suffix tasks). The pattern:
 
 | # | Task | Description |
 |---|------|-------------|
-| 1 | **Scaffold .NET 8 project + test project** | `dotnet new webapp` in `src/ContosoBank/`. `dotnet new xunit` in `tests/ContosoBank.Tests/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore`, `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`. Test project gets: `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.EntityFrameworkCore.InMemory`, `Moq`. Verify both projects build. Use `run-tests` skill to confirm test runner works. |
+| 1 | **Scaffold .NET 8 project + test project** | `dotnet new webapp` in `src/ContosoBank/`. `dotnet new xunit` in `tests/ContosoBank.Tests/`. Add NuGet packages: `Azure.Monitor.OpenTelemetry.AspNetCore`, `OpenTelemetry.Exporter.Prometheus.AspNetCore` (prerelease: `--prerelease`), `OpenTelemetry.Instrumentation.Runtime`, `OpenTelemetry.Instrumentation.SqlClient`, `Microsoft.EntityFrameworkCore.SqlServer`, `Microsoft.EntityFrameworkCore.Design`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`. Test project gets: `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.EntityFrameworkCore.InMemory`, `Moq`. Verify both projects build. Use `run-tests` skill to confirm test runner works. |
 | 2 | **Create data models + DbContext** | `Account.cs`, `Transaction.cs`, `Transfer.cs` in `Models/`. `BankDbContext.cs` with EF Core configuration, indexes, and relationships. `SeedData.cs` for initial demo data. |
 | 2t | **Test: data layer** | Unit tests for model validation and seed data. Integration test with EF Core InMemory provider verifying DbContext creates tables, seeds data, and enforces FK constraints. Use `run-tests` skill. |
 
@@ -730,8 +786,8 @@ Every phase includes its own tests (`#t` suffix tasks). The pattern:
 |---|------|-------------|
 | 3 | **Implement service layer** | `AccountService`, `TransferService`, `TransactionService`, `ReportService`. Business logic separated from controllers. Inject `ILogger<T>` for structured logging. |
 | 3t | **Test: service layer** | Unit tests for each service with mocked DbContext. Test: accounts CRUD, transfer validation (insufficient funds, same-account), transaction queries. Use `run-tests` skill. |
-| 4 | **Implement API controllers** | `AccountsController`, `TransfersController`, `TransactionsController`, `ReportsController`, `SettingsController`, `HealthController`. Full CRUD operations against services. Proper HTTP status codes and error handling. |
-| 4t | **Test: API controllers** | Unit tests with mocked services. Integration tests with `WebApplicationFactory` + InMemory DB: verify each endpoint returns correct status codes, response shapes, and error handling. Test `/health` endpoint. Use `run-tests` skill. |
+| 4 | **Implement API controllers** | `AccountsController`, `TransfersController`, `TransactionsController`, `ReportsController`, `SettingsController`. Full CRUD operations against services. Use `ProblemDetails` (RFC 7807) for error responses. Health checks use built-in `AddHealthChecks()` + `MapHealthChecks()` (not a custom controller) — configured in `Program.cs` with DB readiness check. |
+| 4t | **Test: API controllers** | Unit tests with mocked services. Integration tests with `WebApplicationFactory` + InMemory DB: verify each endpoint returns correct status codes, ProblemDetails error shapes, and error handling. Test `/health/live` and `/health/ready` endpoints. Use `run-tests` skill. |
 | 5 | **Build Razor Pages banking UI** | Professional banking theme with sidebar nav. Pages: Dashboard (`Index.cshtml`), Accounts, Transfers, Transactions, Reports, Settings. Dark blue/white color scheme. Each page includes the natural-looking buttons that will trigger chaos scenarios. Mobile-friendly layout. |
 | 5t | **Test: UI pages with Playwright** | Use `playwright-cli` skill to verify: all 6 pages load without errors, sidebar navigation works with active page highlighting, page content renders (headings, tables, forms). Screenshot each page for visual verification. |
 
@@ -791,6 +847,10 @@ Every phase includes its own tests (`#t` suffix tasks). The pattern:
 | **Managed Grafana** (not self-hosted) | Built-in MCP endpoint, no infra to manage, Azure RBAC integration, deployed via Bicep |
 | **Singleton ChaosService** (not middleware/feature flags) | Fine-grained control per scenario, auto-recovery timers, status tracking, doesn't pollute middleware pipeline |
 | **5-minute auto-recovery** | Demo can be repeated without manual cleanup; long enough for SRE Agent to detect and investigate |
+| **Built-in health checks** (not custom HealthController) | Integrates with Container Apps liveness/readiness probes, standard ASP.NET Core pattern, supports DB readiness via `AddDbContextCheck` |
+| **ProblemDetails** (RFC 7807) for errors | Standard error response format, built into ASP.NET Core, consistent machine-readable errors |
+| **EF Core DbConnectionInterceptor** for DB chaos | Runtime connection string swap doesn't work with DI-registered DbContext; interceptor is the correct EF Core extension point |
+| **No authentication** | Demo app — single anonymous user with pre-seeded data. Keeps deployment simple and demo focused |
 
 ---
 
