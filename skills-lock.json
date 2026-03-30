@@ -36,10 +36,25 @@
       "sourceType": "github",
       "computedHash": "793bb6453f2a01bd5cd07141949f6475c5e13edec8e9c364939944c898791fe2"
     },
+    "directory-build-organization": {
+      "source": "dotnet/skills",
+      "sourceType": "github",
+      "computedHash": "356414a8af03552cbe40cee7e366d54848f7daac93d9d4e9b935f72d32ed9e3c"
+    },
     "entra-app-registration": {
       "source": "microsoft/azure-skills",
       "sourceType": "github",
       "computedHash": "d72e91478541540aaaf0c30dc6caf40cabfae9305d1fa439df99d73458d925cc"
+    },
+    "msbuild-antipatterns": {
+      "source": "dotnet/skills",
+      "sourceType": "github",
+      "computedHash": "fb20ad92ca543cddcc0642fcdb158450afa5519487bf8785247f408004522f4b"
+    },
+    "run-tests": {
+      "source": "dotnet/skills",
+      "sourceType": "github",
+      "computedHash": "67f0e867830f1bdfc9517505a022d8c149eb1f5aa35f6119a4f1185dbd6ce318"
     }
   }
 }
