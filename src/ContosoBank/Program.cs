@@ -1,14 +1,25 @@
 using ContosoBank.Data;
+using ContosoBank.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 
 // Error handling — RFC 7807 ProblemDetails for all API errors
 builder.Services.AddProblemDetails();
+
+// Business services
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<ITransferService, TransferService>();
+builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 // Database — InMemory for development, SQL Server for production
 if (builder.Environment.IsDevelopment())
