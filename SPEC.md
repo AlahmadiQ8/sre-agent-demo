@@ -33,36 +33,20 @@ Unlike existing Microsoft samples (Grubify/Octopets) which use CLI scripts to in
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Azure Container Apps                      │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              Contoso Bank Web App                     │    │
-│  │  ┌──────────────┐    ┌───────────────────────────┐  │    │
-│  │  │ Razor Pages  │───▶│  ASP.NET Core Web API     │  │    │
-│  │  │ (Frontend)   │    │  Controllers + Services   │  │    │
-│  │  └──────────────┘    │  ChaosService (DI)        │  │    │
-│  │                      │  /metrics (Prometheus)    │  │    │
-│  │                      └───────────┬───────────────┘  │    │
-│  └──────────────────────────────────┼──────────────────┘    │
-│                                     │                        │
-└─────────────────────────────────────┼────────────────────────┘
-                                      │
-                    ┌─────────────────┼──────────────────┐
-                    ▼                 ▼                   ▼
-           ┌──────────────┐  ┌──────────────┐   ┌──────────────┐
-           │  Azure SQL   │  │ App Insights │   │  Managed     │
-           │  Database    │  │ + Log        │   │  Grafana +   │
-           │              │  │   Analytics  │   │  Prometheus  │
-           └──────────────┘  └──────────────┘   └──────────────┘
-                                      │                   │
-                                      └─────────┬─────────┘
-                                                ▼
-                                      ┌──────────────────┐
-                                      │  Azure SRE Agent │
-                                      │  (configured     │
-                                      │   separately)    │
-                                      └──────────────────┘
+```mermaid
+graph TD
+    subgraph ACA["Azure Container Apps"]
+        subgraph WebApp["Contoso Bank Web App"]
+            Razor["Razor Pages<br/>(Frontend)"] -->|requests| API["ASP.NET Core Web API<br/>Controllers + Services<br/>ChaosService (DI)<br/>/metrics (Prometheus)"]
+        end
+    end
+
+    API --> SQL[("Azure SQL<br/>Database")]
+    API --> AppInsights["App Insights +<br/>Log Analytics"]
+    API --> Grafana["Managed Grafana +<br/>Prometheus"]
+
+    AppInsights --> SRE["Azure SRE Agent<br/>(configured separately)"]
+    Grafana --> SRE
 ```
 
 ---
@@ -98,34 +82,42 @@ For local development without Azure SQL:
 
 ### Data Model
 
-```
-Accounts
-├── Id (int, PK)
-├── AccountNumber (string, unique)
-├── AccountName (string)
-├── AccountType (enum: Checking/Savings/Credit)
-├── Balance (decimal)
-├── Currency (string, default "USD")
-└── CreatedAt (datetime)
+```mermaid
+erDiagram
+    Accounts {
+        int Id PK
+        string AccountNumber UK
+        string AccountName
+        enum AccountType "Checking / Savings / Credit"
+        decimal Balance
+        string Currency "default USD"
+        datetime CreatedAt
+    }
 
-Transactions
-├── Id (int, PK)
-├── AccountId (int, FK → Accounts)
-├── Type (enum: Credit/Debit)
-├── Amount (decimal)
-├── Description (string)
-├── Category (string)
-├── Timestamp (datetime)
-└── Status (enum: Completed/Pending/Failed)
+    Transactions {
+        int Id PK
+        int AccountId FK
+        enum Type "Credit / Debit"
+        decimal Amount
+        string Description
+        string Category
+        datetime Timestamp
+        enum Status "Completed / Pending / Failed"
+    }
 
-Transfers
-├── Id (int, PK)
-├── FromAccountId (int, FK → Accounts)
-├── ToAccountId (int, FK → Accounts)
-├── Amount (decimal)
-├── Status (enum: Processing/Completed/Failed)
-├── RequestedAt (datetime)
-└── CompletedAt (datetime?)
+    Transfers {
+        int Id PK
+        int FromAccountId FK
+        int ToAccountId FK
+        decimal Amount
+        enum Status "Processing / Completed / Failed"
+        datetime RequestedAt
+        datetime CompletedAt "nullable"
+    }
+
+    Accounts ||--o{ Transactions : "has"
+    Accounts ||--o{ Transfers : "FromAccount"
+    Accounts ||--o{ Transfers : "ToAccount"
 ```
 
 ---
@@ -268,39 +260,24 @@ app.MapPrometheusScrapingEndpoint();          // exposes /metrics
 
 ### Signal Flow to SRE Agent
 
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                          .NET 10 App (OpenTelemetry SDK)                  │
-│                                                                           │
-│  ILogger<T> ───────┐    System.Diagnostics.Metrics ──┐  ActivitySource ─┐ │
-│  (structured logs) │    (custom Meter "ContosoBank") │   (custom spans) │ │
-│                    │                                 │                  │ │
-│                    └──────────┬──────────────────────┘──────────────────┘ │
-│                               │                                           │
-│                        OpenTelemetry SDK                                  │
-│                        ┌──────┴──────┐                                    │
-│                        ▼             ▼                                    │
-│              Azure Monitor      Prometheus                                │
-│                Exporter          Exporter                                 │
-│                   │              (/metrics)                               │
-└───────────────────┼──────────────────┼────────────────────────────────────┘
-                    │                  │
-                    ▼                  ▼
-             ┌──────────┐     Managed Prometheus ───▶ Managed Grafana
-             │App       │            (scrapes)          (dashboards)
-             │Insights +│                                    │
-             │Log       │                              MCP endpoint
-             │Analytics │                             /api/azure-mcp
-             └────┬─────┘                                    │
-                  │                                          │
-                  └──────────────┬───────────────────────────┘
-                                 ▼
-                        ┌────────────────┐
-                        │  SRE Agent     │
-                        │                │
-                        │  Built-in:     │  ← KQL queries against App Insights + Log Analytics
-                        │  Grafana MCP:  │  ← PromQL queries against Prometheus via Grafana
-                        └────────────────┘
+```mermaid
+graph TD
+    subgraph DotNetApp[".NET 10 App (OpenTelemetry SDK)"]
+        Logs["ILogger&lt;T&gt;<br/>(structured logs)"] --> OTel["OpenTelemetry SDK"]
+        Metrics["System.Diagnostics.Metrics<br/>(custom Meter 'ContosoBank')"] --> OTel
+        Traces["ActivitySource<br/>(custom spans)"] --> OTel
+
+        OTel --> AzExporter["Azure Monitor<br/>Exporter"]
+        OTel --> PromExporter["Prometheus<br/>Exporter (/metrics)"]
+    end
+
+    AzExporter --> AppInsights["App Insights +<br/>Log Analytics"]
+    PromExporter --> ManagedProm["Managed Prometheus<br/>(scrapes)"]
+    ManagedProm --> Grafana["Managed Grafana<br/>(dashboards)"]
+    Grafana --> MCP["MCP endpoint<br/>/api/azure-mcp"]
+
+    AppInsights -->|"KQL queries"| SRE["SRE Agent"]
+    MCP -->|"PromQL queries"| SRE
 ```
 
 ### What Each Signal Path Gives SRE Agent
@@ -382,19 +359,11 @@ This is the centerpiece of the demo — showing SRE Agent can connect to **any d
 
 ### How the Pipeline Works
 
-```
-Container App ──▶ /metrics endpoint ──▶ Azure Monitor Managed Prometheus
-     (OTel Prometheus exporter)                   │
-                                                  ▼
-                                      Azure Managed Grafana
-                                      (Prometheus data source)
-                                                  │
-                                         Built-in MCP endpoint
-                                    https://<grafana>/api/azure-mcp
-                                                  │
-                                                  ▼
-                                          Azure SRE Agent
-                                    (MCP Connector → Grafana tools)
+```mermaid
+graph LR
+    App["Container App<br/>(OTel Prometheus exporter)"] -->|"/metrics endpoint"| Prom["Azure Monitor<br/>Managed Prometheus"]
+    Prom --> Grafana["Azure Managed Grafana<br/>(Prometheus data source)"]
+    Grafana -->|"Built-in MCP endpoint<br/>https://‹grafana›/api/azure-mcp"| SRE["Azure SRE Agent<br/>(MCP Connector → Grafana tools)"]
 ```
 
 ### Azure Managed Grafana MCP Endpoint
