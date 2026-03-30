@@ -181,7 +181,7 @@ Each scenario is triggered by a normal-looking banking action. The user clicks a
 | **User Action** | Click "International Transfer" on Transfers page |
 | **What User Sees** | Very slow loading, eventually completes after 30+ seconds |
 | **What Happens** | Injects `Task.Delay(30_000)` into the transfer processing pipeline. Simulates slow external SWIFT/correspondent bank API. |
-| **Telemetry Signals** | P99 latency spike in App Insights, Prometheus histogram `contosobank_request_duration_seconds` shows 30s+ bucket, request queue growing |
+| **Telemetry Signals** | P99 latency spike in App Insights, auto-instrumented `http_server_request_duration_seconds` histogram shows 30s+ bucket, request queue growing |
 | **SRE Agent Finds** | Latency spike on specific endpoint, no CPU/memory issues → points to external dependency or artificial delay |
 
 ### Scenario 6: Dependency Timeout
@@ -328,22 +328,20 @@ public class BankMetrics
     public Counter<long> TransactionsProcessed { get; }    // labels: type=credit|debit
     public UpDownCounter<int> ActiveSessions { get; }
 
-    // Reliability Metrics
-    public Histogram<double> RequestDuration { get; }      // labels: endpoint
+    // Reliability Metrics (RequestDuration removed — covered by http_server_request_duration_seconds auto-instrumentation)
     public Counter<long> DbErrors { get; }                 // labels: error_type
     public Counter<long> DependencyTimeouts { get; }       // labels: dependency
     public Counter<long> Exceptions { get; }               // labels: exception_type
     public Counter<long> LogEntries { get; }               // labels: level
 
-    // Resource Metrics (supplement auto-collected process_* and runtime_* metrics)
-    public UpDownCounter<long> MemoryAllocatedBytes { get; }
+    // Resource Metrics (MemoryAllocatedBytes removed — covered by process_working_set_bytes + dotnet_gc_* auto-instrumentation)
     public UpDownCounter<int> DbConnectionsActive { get; }
 }
 ```
 
 These automatically appear as:
-- **Prometheus/Grafana**: `contosobank_transfers_total{status="success"}`, `contosobank_request_duration_seconds_bucket{endpoint="/api/transfers"}`
-- **Azure Monitor/App Insights**: `ContosoBank/TransfersTotal`, `ContosoBank/RequestDuration`
+- **Prometheus/Grafana**: `contosobank_transfers_total{status="success"}`, `contosobank_db_errors_total{error_type="timeout"}`
+- **Azure Monitor/App Insights**: `ContosoBank/TransfersTotal`, `ContosoBank/DbErrors`
 
 Auto-collected metrics (no custom code needed):
 - `process_cpu_seconds_total`, `process_working_set_bytes` — from `AddProcessInstrumentation()`
