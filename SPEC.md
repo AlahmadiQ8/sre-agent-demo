@@ -269,31 +269,31 @@ app.MapPrometheusScrapingEndpoint();          // exposes /metrics
 ### Signal Flow to SRE Agent
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────────────────────────────────────────┐
 │                          .NET 10 App (OpenTelemetry SDK)                  │
-│                                                                          │
-│  ILogger<T> ──────┐    System.Diagnostics.Metrics ──┐   ActivitySource ─┐│
-│  (structured logs) │    (custom Meter "ContosoBank") │   (custom spans)  ││
-│                    │                                  │                   ││
-│                    └──────────┬───────────────────────┘───────────────────┘│
+│                                                                           │
+│  ILogger<T> ───────┐    System.Diagnostics.Metrics ──┐  ActivitySource ─┐ │
+│  (structured logs) │    (custom Meter "ContosoBank") │   (custom spans) │ │
+│                    │                                 │                  │ │
+│                    └──────────┬──────────────────────┘──────────────────┘ │
 │                               │                                           │
 │                        OpenTelemetry SDK                                  │
 │                        ┌──────┴──────┐                                    │
-│                        ▼              ▼                                    │
+│                        ▼             ▼                                    │
 │              Azure Monitor      Prometheus                                │
-│                Exporter          Exporter                                  │
-│                   │              (/metrics)                                │
+│                Exporter          Exporter                                 │
+│                   │              (/metrics)                               │
 └───────────────────┼──────────────────┼────────────────────────────────────┘
                     │                  │
                     ▼                  ▼
              ┌──────────┐     Managed Prometheus ───▶ Managed Grafana
              │App       │            (scrapes)          (dashboards)
              │Insights +│                                    │
-             │Log       │                             MCP endpoint
-             │Analytics │                         /api/azure-mcp
+             │Log       │                              MCP endpoint
+             │Analytics │                             /api/azure-mcp
              └────┬─────┘                                    │
                   │                                          │
-                  └──────────────┬────────────────────────────┘
+                  └──────────────┬───────────────────────────┘
                                  ▼
                         ┌────────────────┐
                         │  SRE Agent     │
