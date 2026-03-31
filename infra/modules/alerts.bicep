@@ -107,12 +107,12 @@ resource a2OomRestart 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 1
     enabled: true
     scopes: [logAnalyticsWorkspaceId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
         {
-          query: 'ContainerAppSystemLogs_CL | where Reason_s == "OOMKilled"'
+          query: 'ContainerAppSystemLogs | where Reason == "OOMKilled"'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 0
@@ -139,7 +139,7 @@ resource a4Http5xx 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' =
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -171,7 +171,7 @@ resource a5DbFailures 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -203,7 +203,7 @@ resource a6HighLatency 'Microsoft.Insights/scheduledQueryRules@2023-03-15-previe
     severity: 2
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -235,7 +235,7 @@ resource a7DepTimeout 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 2
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -272,7 +272,7 @@ resource a8LogVolume 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview'
     criteria: {
       allOf: [
         {
-          query: 'ContainerAppConsoleLogs_CL | where ContainerAppName_s == "${containerAppName}"'
+          query: 'ContainerAppConsoleLogs | where ContainerAppName == \'${containerAppName}\''
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 5000
@@ -299,7 +299,7 @@ resource a9ExceptionSpike 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pre
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -331,7 +331,7 @@ resource a10HealthDegraded 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT1M'
+    evaluationFrequency: 'PT5M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [

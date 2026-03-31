@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InternalsVisibleTo>ContosoBank.Tests</InternalsVisibleTo>
+    <UserSecretsId>d447af00-e810-4744-ade8-6c24f70c786b</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

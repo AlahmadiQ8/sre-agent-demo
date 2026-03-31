@@ -35,7 +35,7 @@ resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' = {
 }
 
 // Grafana Admin role for the deploying user
-var grafanaAdminRoleId = '22926164-76b3-42b6-b3c9-c0f0c7582a5f'
+var grafanaAdminRoleId = '22926164-76b3-42b3-bc55-97df8dab3e41'
 
 resource grafanaAdminForUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(principalId)) {
   name: guid(grafana.id, principalId, grafanaAdminRoleId)

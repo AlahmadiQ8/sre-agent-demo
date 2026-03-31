@@ -42,7 +42,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       containers: [
         {
           name: 'contoso-bank'
-          image: '${containerRegistryLoginServer}/contoso-bank:latest'
+          image: 'mcr.microsoft.com/k8se/quickstart:latest'
           resources: {
             cpu: json('1')
             memory: '2Gi'
