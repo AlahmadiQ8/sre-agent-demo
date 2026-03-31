@@ -24,7 +24,7 @@ All scenarios **auto-recover after 5 minutes**, so you can repeat the demo.
 ## Suggested Demo Flow
 
 1. **Open the app** in browser — show it's a working banking app
-2. **Open Grafana** side-by-side — show healthy dashboards
+2. **Open Grafana** side-by-side — show healthy dashboard
 3. **Open SRE Agent** (sre.azure.com) — show it's monitoring
 4. **Click a button** (e.g., "Generate Annual Statement" on Reports)
 5. **Watch Grafana** — see metrics change in real-time

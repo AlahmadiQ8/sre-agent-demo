@@ -26,7 +26,7 @@ Unlike existing Microsoft samples (Grubify/Octopets) which use CLI scripts to in
 | Observability | OpenTelemetry SDK (unified logs, metrics, traces) | — |
 | Traces + Logs | Azure Monitor OpenTelemetry exporter | App Insights + Log Analytics |
 | Metrics | OpenTelemetry Prometheus exporter (`/metrics`) | Azure Monitor Managed Prometheus |
-| Dashboards | Azure Managed Grafana | Grafana dashboards + MCP endpoint |
+| Dashboards | Azure Managed Grafana | Single consolidated Grafana dashboard + MCP endpoint |
 | IaC | Bicep + Azure Developer CLI (azd) | One-command deployment |
 
 ---
@@ -401,7 +401,7 @@ During a demo, when SRE Agent investigates an incident, it can:
 
 1. **Query Prometheus metrics directly** — e.g., "What was the memory usage trend for the last hour?"
    → SRE Agent runs: `query_prometheus("process_working_set_bytes{job='contoso-bank'}", range="1h")`
-2. **Reference dashboards** — e.g., "Show me the Infrastructure Health dashboard"
+2. **Reference the dashboard** — e.g., "Show me the Contoso Bank dashboard"
    → SRE Agent fetches the dashboard and includes metric visualizations in its report
 3. **Cross-correlate** — Combine App Insights traces + Prometheus metrics + Log Analytics logs in a single investigation
 4. **Demonstrate extensibility** — "SRE Agent doesn't just work with Azure Monitor — it connects to Grafana, Datadog, Splunk, etc. via MCP"
@@ -416,34 +416,26 @@ The Managed Grafana instance is deployed with these data sources pre-configured:
 | Azure Monitor | Azure Monitor | Azure platform metrics (CPU, memory, network for Container App) |
 | Azure Log Analytics | Logs | KQL queries against container and application logs |
 
-### Pre-Built Dashboards
+### Pre-Built Dashboard
 
-Deployed as provisioned dashboards via post-provision script:
+A single consolidated **Contoso Bank** dashboard is deployed via post-provision script. One dashboard keeps the demo simple — the presenter never has to switch between dashboards, and every chaos scenario's impact is visible at a glance.
 
-1. **Contoso Bank Overview**
-   - Panels: Request rate (by endpoint), error rate (4xx/5xx), P50/P95/P99 latency, active sessions gauge
-   - Data source: Prometheus
-   - Key for demo: Shows real-time impact when chaos scenarios are triggered
+**Contoso Bank** (`grafana/dashboards/contoso-bank.json`)
 
-2. **Infrastructure Health**
-   - Panels: CPU usage, memory usage, network I/O, container restart count, thread pool size
-   - Data source: Prometheus + Azure Monitor
-   - Key for demo: Memory leak and CPU spike scenarios create dramatic visual changes
+Organized into collapsible row sections:
 
-3. **Database Performance**
-   - Panels: Query latency histogram, active connections gauge, error rate by type, connection pool utilization
-   - Data source: Prometheus (custom `contosobank_db_*` metrics)
-   - Key for demo: DB connection failure scenario shows connections dropping to zero
-
-4. **Business Metrics**
-   - Panels: Transfers/min (success vs failed), transaction volume, account balance changes, batch processing status
-   - Data source: Prometheus (custom `contosobank_transfers_*` metrics)
-   - Key for demo: HTTP 500 and exception storm scenarios show business impact (failed transfers)
+| Row Section | Panels | Data Source | Demo Value |
+|------------|--------|-------------|------------|
+| **Overview** | Request rate (by endpoint), error rate (4xx/5xx), P50/P95/P99 latency | Prometheus | Shows real-time impact when any chaos scenario is triggered |
+| **Infrastructure** | CPU usage, memory usage, container restart count, thread pool size | Prometheus + Azure Monitor | Memory leak and CPU spike scenarios create dramatic visual changes |
+| **Database** | Query latency histogram, active connections gauge, error rate by type | Prometheus (`contosobank_db_*`) | DB connection failure scenario shows connections dropping to zero |
+| **Business** | Transfers/min (success vs failed), transaction volume, batch processing status | Prometheus (`contosobank_transfers_*`) | HTTP 500 and exception storm scenarios show business impact |
 
 ### Dashboard JSON Structure
 
-Each dashboard JSON lives in `grafana/dashboards/` and includes:
-- Panel definitions with PromQL queries
+The dashboard JSON lives at `grafana/dashboards/contoso-bank.json` and includes:
+- Collapsible row panels grouping related metrics (Overview, Infrastructure, Database, Business)
+- Panel definitions with PromQL queries targeting `contosobank_*` and `process_*` metrics
 - Variable templates (for environment/namespace filtering)
 - Alert thresholds matching the Azure Monitor alert rules
 - Time range defaults optimized for demo visibility (last 15 minutes)
@@ -550,7 +542,7 @@ azd down  # Tears it all down
 Automated by `scripts/post-provision.sh`:
 - Seeds the database with sample accounts and transactions
 - Configures Grafana data sources (Prometheus, Azure Monitor, Log Analytics)
-- Imports Grafana dashboard JSON definitions
+- Imports the Grafana dashboard JSON
 - Configures Prometheus scraping for the Container App `/metrics` endpoint
 - Outputs the Grafana MCP endpoint URL for SRE Agent connector setup
 - Assigns `Grafana Admin` role to the deployment identity
@@ -618,7 +610,7 @@ The app itself does NOT deploy or configure SRE Agent. However, it is designed t
 2. **Log Analytics** — All container logs flow here; SRE Agent queries via KQL
 3. **Azure Monitor Alerts** — 10 pre-configured alert rules (A1–A10) mapped to all 8 chaos scenarios: memory > 80%, CPU > 90%, HTTP 5xx > 10/5min, DB failures > 5/5min, P95 latency > 10s, dependency timeouts > 3/5min, log volume > 5000/5min, exceptions > 50/5min, OOM restarts, and health check failures (see [Azure Monitor Alert Rules](#azure-monitor-alert-rules))
 4. **Prometheus /metrics** — SRE Agent connects via Grafana MCP connector to query custom metrics
-5. **Grafana Dashboards** — SRE Agent can reference dashboards during investigation and include chart screenshots in reports
+5. **Grafana Dashboard** — SRE Agent can reference the dashboard during investigation and include chart screenshots in reports
 6. **Source Code (GitHub)** — SRE Agent can search the repo for root cause analysis, finding `ChaosService` as the culprit
 
 ---
@@ -626,7 +618,7 @@ The app itself does NOT deploy or configure SRE Agent. However, it is designed t
 ## Demo Flow
 
 1. **Open Contoso Bank** in browser — show it's a working banking app
-2. **Open Grafana** side-by-side — show healthy metrics/dashboards
+2. **Open Grafana** side-by-side — show the healthy dashboard
 3. **Open SRE Agent portal** (sre.azure.com) — show it's monitoring the resources
 4. **Trigger a scenario** — click a button in the banking app (e.g., "Generate Annual Statement")
 5. **Watch Grafana** — see metrics change in real-time (memory climbing)
@@ -716,14 +708,11 @@ contoso-bank/
 │       ├── Services/                   # Service layer unit tests
 │       └── Integration/               # Integration tests (WebApplicationFactory)
 ├── scripts/
-│   ├── post-provision.sh               # azd hook: DB seed + Grafana dashboards + Prometheus config
+│   ├── post-provision.sh               # azd hook: DB seed + Grafana dashboard + Prometheus config
 │   └── seed-data.sql                   # Sample banking data (accounts, transactions, transfers)
 ├── grafana/
 │   └── dashboards/
-│       ├── overview.json               # Contoso Bank Overview dashboard
-│       ├── infrastructure.json         # Infrastructure Health dashboard
-│       ├── database.json               # Database Performance dashboard
-│       └── business.json               # Business Metrics dashboard
+│       └── contoso-bank.json           # Single consolidated dashboard (Overview + Infrastructure + Database + Business rows)
 ```
 
 > **Note:** CI/CD pipeline (`.github/workflows/`) will be added in a later phase, not part of initial implementation.
@@ -797,10 +786,10 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 
 | # | Task | Description |
 |---|------|-------------|
-| 13 | **Build Grafana dashboard JSONs** | 4 dashboards in `grafana/dashboards/`: Overview, Infrastructure, Database, Business. Each with PromQL queries targeting `contosobank_*` and `process_*` metrics. Variable templates for environment filtering. 15-minute default time range. |
-| 13t | **Test: dashboard JSON validity** | Validate each JSON file parses correctly and contains required Grafana schema fields (`panels`, `title`, `templating`, `time`). Script or unit test. |
+| 13 | **Build Grafana dashboard JSON** | Single consolidated dashboard in `grafana/dashboards/contoso-bank.json` with collapsible row sections: Overview, Infrastructure, Database, Business. PromQL queries targeting `contosobank_*` and `process_*` metrics. Variable templates for environment filtering. 15-minute default time range. |
+| 13t | **Test: dashboard JSON validity** | Validate the JSON file parses correctly and contains required Grafana schema fields (`panels`, `title`, `templating`, `time`). Script or unit test. |
 | 14 | **Write database seed script** | `scripts/seed-data.sql` — realistic banking data: 5 accounts (2 checking, 1 savings, 1 credit, 1 business), 100+ transactions across 30 days, 10+ recent transfers. |
-| 15 | **Write post-provision script** | `scripts/post-provision.sh` — runs after `azd provision`: executes SQL seed script, configures Grafana data sources via API, imports dashboard JSONs, outputs Grafana MCP URL. |
+| 15 | **Write post-provision script** | `scripts/post-provision.sh` — runs after `azd provision`: executes SQL seed script, configures Grafana data sources via API, imports dashboard JSON, outputs Grafana MCP URL. |
 
 ### Phase 7: Documentation + Final Validation
 
