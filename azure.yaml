@@ -1,0 +1,17 @@
+name: contoso-bank
+metadata:
+  template: azd-init
+
+services:
+  contoso-bank:
+    project: ./src/ContosoBank
+    language: dotnet
+    host: containerapp
+    docker:
+      path: ./src/ContosoBank/Dockerfile
+      context: ./src/ContosoBank
+
+hooks:
+  postprovision:
+    shell: sh
+    run: ./scripts/post-provision.sh
