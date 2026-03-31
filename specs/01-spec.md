@@ -450,6 +450,76 @@ Each dashboard JSON lives in `grafana/dashboards/` and includes:
 
 ---
 
+## Azure Monitor Alert Rules
+
+Pre-configured alert rules deployed via `infra/modules/alerts.bicep`. Each alert maps to one or more chaos scenarios so that SRE Agent is automatically notified when a demo failure is triggered. Alerts use an **Azure Monitor Action Group** (`contosobank-alerts-ag`) that can optionally be wired to an email/webhook — for the demo, the alerts exist primarily as signals for SRE Agent to detect and investigate.
+
+### Alert Design Principles
+
+1. **One alert per chaos scenario** — Every scenario triggers at least one alert, giving SRE Agent a clear starting point for investigation.
+2. **Low thresholds for demo speed** — Thresholds are intentionally lower than production defaults so alerts fire within 1–2 minutes of triggering a chaos scenario (demo audiences won't wait 10 minutes).
+3. **Short evaluation windows** — 5-minute windows with 1-minute frequency ensure fast detection without excessive noise.
+4. **Descriptive alert names** — Names include the failure domain (e.g., "Database", "Latency") so SRE Agent's investigation report reads naturally.
+5. **Severity mapping** — Sev 1 (Critical) for data-path failures, Sev 2 (Warning) for resource saturation, Sev 3 (Informational) for operational anomalies.
+
+### Alert Definitions
+
+| # | Alert Name | Bicep Resource Type | Source | KQL / Metric Condition | Sev | Freq | Window | Scenario |
+|---|-----------|---------------------|--------|----------------------|-----|------|--------|----------|
+| A1 | **High Memory Usage** | `Microsoft.Insights/metricAlerts` | Container App | Platform metric `UsageNanoCores` — Avg memory working set percentage > **80%** | 2 | 1 min | 5 min | 1: Memory Leak |
+| A2 | **Container OOM Restart** | `Microsoft.Insights/scheduledQueryRules` | Log Analytics | `ContainerAppSystemLogs_CL \| where Reason_s == "OOMKilled" \| summarize count() > 0` | 1 | 1 min | 5 min | 1: Memory Leak (OOM kill) |
+| A3 | **High CPU Usage** | `Microsoft.Insights/metricAlerts` | Container App | Platform metric `UsageNanoCores` — Avg CPU usage percentage > **90%** | 2 | 1 min | 5 min | 2: CPU Spike |
+| A4 | **HTTP 5xx Error Spike** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `requests \| where toint(resultCode) >= 500 \| summarize count() > 10` | 1 | 1 min | 5 min | 3: HTTP 500 Errors |
+| A5 | **Database Dependency Failures** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `dependencies \| where type == "SQL" and success == false \| summarize count() > 5` | 1 | 1 min | 5 min | 4: DB Connection Failure |
+| A6 | **High Request Latency (P95)** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `requests \| summarize percentile(duration, 95) > 10000` (10 seconds) | 2 | 1 min | 5 min | 5: Slow API |
+| A7 | **Dependency Timeout Spike** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `dependencies \| where success == false and duration > 30000 \| summarize count() > 3` | 2 | 1 min | 5 min | 6: Dependency Timeout |
+| A8 | **Abnormal Log Volume** | `Microsoft.Insights/scheduledQueryRules` | Log Analytics | `ContainerAppConsoleLogs_CL \| summarize count() > 5000` | 3 | 5 min | 5 min | 7: Log Flooding |
+| A9 | **Exception Rate Spike** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `exceptions \| summarize count() > 50` | 1 | 1 min | 5 min | 8: Exception Storm |
+| A10 | **Health Check Degraded** | `Microsoft.Insights/scheduledQueryRules` | App Insights | `requests \| where name has "health" and toint(resultCode) != 200 \| summarize count() > 3` | 1 | 1 min | 5 min | General (any severe scenario) |
+
+### Alert → Scenario Mapping (SRE Agent Investigation Paths)
+
+When SRE Agent receives an alert, it follows different investigation paths depending on the alert type:
+
+| Alert Fired | SRE Agent Investigation Path |
+|------------|------------------------------|
+| A1 (Memory) | Query `process_working_set_bytes` trend via Grafana MCP → Check container logs for OOM warnings → Identify `/api/reports/annual-statement` as the allocating endpoint → Find `ChaosService.TriggerMemoryLeak` in source |
+| A2 (OOM Restart) | Correlate restart event with A1 memory spike → Check App Insights for `OutOfMemoryException` → Timeline shows memory growth → restart → recovery cycle |
+| A3 (CPU) | Query `process_cpu_seconds_total` via Grafana MCP → Check thread pool metrics → Identify `/api/dashboard/fraud-detection` as the hot endpoint → Find tight loop in `ChaosService.TriggerCpuSpike` |
+| A4 (HTTP 5xx) | Query App Insights `requests` for 5xx breakdown by endpoint → All failures on `/api/transfers/*` → Exception details show `InvalidOperationException` → Trace to `ChaosService.TriggerHttpErrors` flag |
+| A5 (DB Failures) | Query App Insights dependency map → All SQL dependencies failing → `SqlException` in traces → Correlate with `ChaosDbInterceptor` throwing on `ConnectionOpening` |
+| A6 (Latency) | Query `http_server_request_duration_seconds` histogram via Grafana → P99 spike isolated to `/api/transfers/international` → No CPU/memory pressure → Artificial `Task.Delay` in code |
+| A7 (Dep Timeout) | Query App Insights dependencies → HttpClient calls to `10.255.255.1` timing out → Thread pool exhaustion metrics rising → `ChaosService.TriggerDependencyTimeout` making non-routable calls |
+| A8 (Log Volume) | Query Log Analytics ingestion rate → 100x normal volume → All from Debug/Trace level → Correlate with `/api/transactions/export` → `ChaosService.TriggerLogFlooding` changed log level |
+| A9 (Exceptions) | Query App Insights exceptions by type → Multiple types (`NullReferenceException`, `ArgumentException`, `DivideByZeroException`, `FormatException`) → All from batch reconciliation code → `ChaosService.TriggerExceptionStorm` |
+| A10 (Health) | Health probe failing → Check which dependency is down → Cross-reference with other active alerts (A5 for DB, A7 for external deps) → Identify cascading failure |
+
+### Bicep Implementation Notes
+
+The `alerts.bicep` module receives these parameters from `main.bicep`:
+
+```bicep
+param containerAppId string          // Target resource for metric alerts (A1, A3)
+param appInsightsId string            // Scope for App Insights scheduled query rules (A4–A7, A9, A10)
+param logAnalyticsWorkspaceId string  // Scope for Log Analytics scheduled query rules (A2, A8)
+param actionGroupName string          // Action group for all alerts (default: 'contosobank-alerts-ag')
+```
+
+Metric alerts (A1, A3) use `Microsoft.Insights/metricAlerts` targeting the Container App resource directly. All other alerts use `Microsoft.Insights/scheduledQueryRules` (v2) with KQL queries against either App Insights or Log Analytics.
+
+Each scheduled query rule specifies:
+- `scopes`: The App Insights or Log Analytics workspace resource ID
+- `criteria.allOf[0].query`: The KQL query
+- `criteria.allOf[0].threshold`: The numeric threshold
+- `criteria.allOf[0].operator`: `GreaterThan`
+- `criteria.allOf[0].timeAggregation`: `Count` (for count-based) or `Average` (for percentile-based)
+- `evaluationFrequency`: Alert evaluation interval (ISO 8601 duration)
+- `windowSize`: Lookback window (ISO 8601 duration)
+- `severity`: 1–3 as defined above
+- `autoMitigate`: `true` (auto-resolve when condition clears — important for repeatable demos)
+
+---
+
 ## Infrastructure as Code (Bicep + azd)
 
 ### Deployed Resources
@@ -465,7 +535,7 @@ Each dashboard JSON lives in `grafana/dashboards/` and includes:
 | Azure Monitor Workspace | `modules/prometheus.bicep` | Managed Prometheus + scrape config for Container App |
 | Azure Managed Grafana | `modules/grafana.bicep` | Dashboards + MCP endpoint for SRE Agent |
 | Data Collection Rule | `modules/prometheus.bicep` | Routes Prometheus metrics from Container App → Monitor Workspace |
-| Alert Rules | `modules/alerts.bicep` | CPU, memory, HTTP 5xx, latency |
+| Alert Rules + Action Group | `modules/alerts.bicep` | 10 pre-configured alerts mapped to all 8 chaos scenarios (see [Azure Monitor Alert Rules](#azure-monitor-alert-rules) section) |
 | Managed Identity | `modules/identity.bicep` | RBAC for app + monitoring + Grafana Admin |
 
 ### One-Command Deployment
@@ -546,7 +616,7 @@ The app itself does NOT deploy or configure SRE Agent. However, it is designed t
 
 1. **Application Insights** — Traces, exceptions, dependencies, and request telemetry automatically collected
 2. **Log Analytics** — All container logs flow here; SRE Agent queries via KQL
-3. **Azure Monitor Alerts** — Pre-configured alert rules fire on CPU > 90%, memory > 85%, HTTP 5xx > 10/min, P99 latency > 10s
+3. **Azure Monitor Alerts** — 10 pre-configured alert rules (A1–A10) mapped to all 8 chaos scenarios: memory > 80%, CPU > 90%, HTTP 5xx > 10/5min, DB failures > 5/5min, P95 latency > 10s, dependency timeouts > 3/5min, log volume > 5000/5min, exceptions > 50/5min, OOM restarts, and health check failures (see [Azure Monitor Alert Rules](#azure-monitor-alert-rules))
 4. **Prometheus /metrics** — SRE Agent connects via Grafana MCP connector to query custom metrics
 5. **Grafana Dashboards** — SRE Agent can reference dashboards during investigation and include chart screenshots in reports
 6. **Source Code (GitHub)** — SRE Agent can search the repo for root cause analysis, finding `ChaosService` as the culprit
@@ -719,7 +789,7 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 |---|------|-------------|
 | 10 | **Create Dockerfile** | Multi-stage Dockerfile: `mcr.microsoft.com/dotnet/sdk:10.0` for build, `mcr.microsoft.com/dotnet/aspnet:10.0` for runtime. Expose port 8080. Set `ASPNETCORE_URLS`. Health check instruction. Optimize layer caching (copy `.csproj` first, then `dotnet restore`, then copy source). |
 | 10t | **Test: Docker build** | Verify `docker build` succeeds, container starts, health endpoint responds. Test locally with `docker run`. |
-| 11 | **Write Bicep IaC modules** | All modules in `infra/modules/`: `container-env.bicep`, `container-app.bicep`, `sql.bicep`, `monitoring.bicep`, `prometheus.bicep`, `grafana.bicep`, `alerts.bicep`, `identity.bicep`. Entry point `main.bicep` orchestrating all modules. `main.bicepparam` with sensible defaults. |
+| 11 | **Write Bicep IaC modules** | All modules in `infra/modules/`: `container-env.bicep`, `container-app.bicep`, `sql.bicep`, `monitoring.bicep`, `prometheus.bicep`, `grafana.bicep`, `alerts.bicep` (10 alert rules A1–A10 as defined in the [Azure Monitor Alert Rules](#azure-monitor-alert-rules) section, plus action group), `identity.bicep`. Entry point `main.bicep` orchestrating all modules. `main.bicepparam` with sensible defaults. |
 | 11t | **Test: Bicep validation** | Run `az bicep build` and `az deployment group validate` (or `what-if`) to verify templates are syntactically correct and parameters resolve. |
 | 12 | **Create azd configuration** | `azure.yaml` defining the project, services, and hooks. Post-provision hook pointing to `scripts/post-provision.sh`. Environment variable mapping for connection strings and instrumentation keys. |
 
