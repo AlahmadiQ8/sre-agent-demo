@@ -98,3 +98,15 @@ brew install k6    # macOS
 6. **Watch Grafana** — see metrics change in real-time
 7. **Watch SRE Agent** — see it detect, investigate, and correlate
 8. **Repeat** with `--only` to trigger additional scenarios
+
+---
+
+## Resetting the App After a Demo
+
+Chaos scenarios auto-recover after 5 minutes, but **memory leaks persist until the process restarts** (GC can't reclaim the held references). To guarantee a fully clean state, restart the container app:
+
+```bash
+APP=$(az containerapp list -g rg-sre-agent-demo-2 --query "[0].name" -o tsv)
+az containerapp revision restart -g rg-sre-agent-demo-2 -n $APP \
+  --revision $(az containerapp revision list -g rg-sre-agent-demo-2 -n $APP --query "[?properties.active].name | [0]" -o tsv)
+```
