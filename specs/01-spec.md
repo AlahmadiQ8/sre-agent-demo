@@ -1,5 +1,7 @@
 # Contoso Bank — Azure SRE Agent Demo
 
+> **Status: COMPLETE ✅** — All 19 tasks implemented and validated. Do not modify this spec. New features go in `02-spec.md`.
+
 ## Project Summary
 
 **Contoso Bank** is a purpose-built online banking portal designed to showcase Azure SRE Agent's ability to investigate, diagnose, and mitigate real-world production issues in seconds. The app looks and feels like a genuine banking application, but specific user actions silently trigger realistic failure modes that SRE Agent can detect and resolve.
