@@ -25,8 +25,8 @@ Unlike existing Microsoft samples (Grubify/Octopets) which use CLI scripts to in
 | Database | Entity Framework Core | Azure SQL Database |
 | Observability | OpenTelemetry SDK (unified logs, metrics, traces) | — |
 | Traces + Logs | Azure Monitor OpenTelemetry exporter | App Insights + Log Analytics |
-| Metrics | OpenTelemetry Prometheus exporter (`/metrics`) | Azure Monitor Managed Prometheus |
-| Dashboards | Azure Managed Grafana | Single consolidated Grafana dashboard + MCP endpoint |
+| Metrics | Azure Monitor OpenTelemetry exporter + Prometheus `/metrics` endpoint | App Insights (via Log Analytics KQL) |
+| Dashboards | Azure Managed Grafana (KQL queries against App Insights) | Single consolidated Grafana dashboard + MCP endpoint |
 | IaC | Bicep + Azure Developer CLI (azd) | One-command deployment |
 
 ---
@@ -41,9 +41,9 @@ graph TD
         end
     end
 
+    API -->|"UseAzureMonitor()"| AppInsights["App Insights +<br/>Log Analytics"]
     API --> SQL[("Azure SQL<br/>Database")]
-    API --> AppInsights["App Insights +<br/>Log Analytics"]
-    API --> Grafana["Managed Grafana +<br/>Prometheus"]
+    AppInsights -->|"KQL queries"| Grafana["Managed Grafana<br/>(dashboard + MCP)"]
 
     AppInsights --> SRE["Azure SRE Agent<br/>(configured separately)"]
     Grafana --> SRE
@@ -210,7 +210,7 @@ Each scenario is triggered by a normal-looking banking action. The user clicks a
 
 ## Observability: OpenTelemetry Unified Pipeline
 
-The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs, metrics, traces), with dual export to Azure Monitor and Prometheus. This avoids duplicate metric definitions and aligns with Microsoft's recommended .NET approach.
+The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs, metrics, traces), exporting to Azure Monitor (App Insights + Log Analytics). Metrics are also exposed via a Prometheus `/metrics` endpoint for local development. The Grafana dashboard queries App Insights data via **KQL (Azure Log Analytics)**.
 
 ### NuGet Packages
 
@@ -218,7 +218,7 @@ The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs
 <!-- OpenTelemetry Core + Azure Monitor -->
 <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
 
-<!-- Prometheus /metrics endpoint (prerelease — no stable version available) -->
+<!-- Prometheus /metrics endpoint (prerelease — for local dev + future Prometheus scraping) -->
 <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.1-beta.1" />
 
 <!-- Auto-instrumentation -->
@@ -226,7 +226,7 @@ The app uses **OpenTelemetry as a single unified layer** for all telemetry (logs
 <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
 ```
 
-> **Note:** `OpenTelemetry.Exporter.Prometheus.AspNetCore` has no stable release. Install with `dotnet add package OpenTelemetry.Exporter.Prometheus.AspNetCore --prerelease`. This is acceptable for a demo application. The alternative (OTLP exporter → OTel Collector → Prometheus) is more complex but production-stable.
+> **Note:** `OpenTelemetry.Exporter.Prometheus.AspNetCore` has no stable release. Install with `dotnet add package OpenTelemetry.Exporter.Prometheus.AspNetCore --prerelease`. The Prometheus endpoint is exposed for local development tooling; in production, the Grafana dashboard queries App Insights via KQL instead.
 
 ### Program.cs Wiring
 
@@ -250,7 +250,7 @@ builder.Services.AddOpenTelemetry()
         .AddRuntimeInstrumentation()          // GC, thread pool, memory
         .AddProcessInstrumentation()          // CPU seconds, working set
         .AddMeter("ContosoBank")              // custom business + reliability metrics
-        .AddPrometheusExporter())             // /metrics endpoint for Grafana
+        .AddPrometheusExporter())             // /metrics endpoint for local dev
     .UseAzureMonitor();                       // → App Insights + Log Analytics
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }); // liveness: always 200
@@ -267,17 +267,17 @@ graph TD
         Metrics["System.Diagnostics.Metrics<br/>(custom Meter 'ContosoBank')"] --> OTel
         Traces["ActivitySource<br/>(custom spans)"] --> OTel
 
-        OTel --> AzExporter["Azure Monitor<br/>Exporter"]
+        OTel --> AzExporter["Azure Monitor<br/>Exporter (UseAzureMonitor)"]
         OTel --> PromExporter["Prometheus<br/>Exporter (/metrics)"]
     end
 
     AzExporter --> AppInsights["App Insights +<br/>Log Analytics"]
-    PromExporter --> ManagedProm["Managed Prometheus<br/>(scrapes)"]
-    ManagedProm --> Grafana["Managed Grafana<br/>(dashboards)"]
+    PromExporter -.->|"local dev only"| LocalProm["Local Prometheus<br/>(docker-compose)"]
+    AppInsights -->|"KQL queries"| Grafana["Managed Grafana<br/>(dashboard)"]
     Grafana --> MCP["MCP endpoint<br/>/api/azure-mcp"]
 
     AppInsights -->|"KQL queries"| SRE["SRE Agent"]
-    MCP -->|"PromQL queries"| SRE
+    MCP -->|"KQL queries"| SRE
 ```
 
 ### What Each Signal Path Gives SRE Agent
@@ -285,8 +285,8 @@ graph TD
 | Signal | Destination | SRE Agent Access | What It Sees |
 |--------|------------|-----------------|-------------|
 | **Traces** | App Insights | Built-in tools (KQL) | Request traces, dependency calls (SQL, HTTP), exception stack traces with full correlation |
-| **Metrics** | Azure Monitor | Built-in tools | Platform metrics + custom `ContosoBank.*` meters |
-| **Metrics** | Prometheus → Grafana | Grafana MCP connector (PromQL) | Same custom meters via PromQL + dashboard panel visuals |
+| **Metrics** | App Insights (via `UseAzureMonitor()`) | Built-in tools + Grafana MCP | Custom `ContosoBank.*` meters + runtime/process metrics in `AppMetrics` table |
+| **Metrics** | Grafana dashboard (KQL) | Grafana MCP connector | Dashboard panels visualizing `AppRequests` and `AppMetrics` KQL queries |
 | **Logs** | Container stdout → Log Analytics | Built-in tools (KQL) | Structured ILogger entries — chaos triggers, errors, debug flood |
 | **Logs** | App Insights (via OTel) | Built-in tools | Log entries correlated with traces for full request context |
 | **Exceptions** | App Insights | Built-in tools | Exception types, stack traces, frequency, affected endpoints |
@@ -353,7 +353,7 @@ Log levels matter for the demo:
 
 ---
 
-## Grafana + Prometheus + SRE Agent Integration
+## Grafana + Azure Monitor + SRE Agent Integration
 
 This is the centerpiece of the demo — showing SRE Agent can connect to **any data source**, not just native Azure telemetry.
 
@@ -361,8 +361,8 @@ This is the centerpiece of the demo — showing SRE Agent can connect to **any d
 
 ```mermaid
 graph LR
-    App["Container App<br/>(OTel Prometheus exporter)"] -->|"/metrics endpoint"| Prom["Azure Monitor<br/>Managed Prometheus"]
-    Prom --> Grafana["Azure Managed Grafana<br/>(Prometheus data source)"]
+    App["Container App<br/>(UseAzureMonitor exporter)"] -->|"metrics + traces + logs"| AI["App Insights +<br/>Log Analytics"]
+    AI -->|"KQL queries"| Grafana["Azure Managed Grafana<br/>(Azure Monitor data source)"]
     Grafana -->|"Built-in MCP endpoint<br/>https://‹grafana›/api/azure-mcp"| SRE["Azure SRE Agent<br/>(MCP Connector → Grafana tools)"]
 ```
 
@@ -377,10 +377,9 @@ This means **no separate MCP server to deploy** — Grafana itself is the MCP se
 
 | MCP Tool | What SRE Agent Can Do |
 |----------|----------------------|
-| `query_prometheus` | Run PromQL queries against any Prometheus data source |
+| `query_datasource` | Run KQL queries against App Insights / Log Analytics |
 | `list_dashboards` | Discover available Grafana dashboards |
 | `get_dashboard` | Retrieve dashboard JSON with panel definitions |
-| `query_datasource` | Query any data source connected to Grafana |
 | `list_datasources` | Enumerate all configured data sources |
 | `search_annotations` | Find Grafana annotations (correlate with events) |
 
@@ -399,22 +398,22 @@ After deploying the app infrastructure, the user configures SRE Agent to connect
 
 During a demo, when SRE Agent investigates an incident, it can:
 
-1. **Query Prometheus metrics directly** — e.g., "What was the memory usage trend for the last hour?"
-   → SRE Agent runs: `query_prometheus("process_working_set_bytes{job='contoso-bank'}", range="1h")`
+1. **Query App Insights metrics via Grafana** — e.g., "What was the memory usage trend for the last hour?"
+   → SRE Agent queries the `AppMetrics` table via the Azure Monitor data source
 2. **Reference the dashboard** — e.g., "Show me the Contoso Bank dashboard"
    → SRE Agent fetches the dashboard and includes metric visualizations in its report
-3. **Cross-correlate** — Combine App Insights traces + Prometheus metrics + Log Analytics logs in a single investigation
+3. **Cross-correlate** — Combine App Insights traces + metrics + Log Analytics logs in a single investigation
 4. **Demonstrate extensibility** — "SRE Agent doesn't just work with Azure Monitor — it connects to Grafana, Datadog, Splunk, etc. via MCP"
 
-### Grafana Data Sources (configured by Bicep)
+### Grafana Data Sources (configured by post-provision script)
 
-The Managed Grafana instance is deployed with these data sources pre-configured:
+The Managed Grafana instance is configured with these data sources:
 
 | Data Source | Type | What It Provides |
 |------------|------|-----------------|
-| Azure Monitor Managed Prometheus | Prometheus | App custom metrics (`contosobank_*`), process metrics |
-| Azure Monitor | Azure Monitor | Azure platform metrics (CPU, memory, network for Container App) |
-| Azure Log Analytics | Logs | KQL queries against container and application logs |
+| Managed Prometheus | `grafana-azureprometheus-datasource` | Auto-configured via Bicep Azure Monitor Workspace integration (available for future Prometheus scraping) |
+| Azure Monitor | `grafana-azure-monitor-datasource` | Platform metrics + App Insights queries |
+| Log Analytics | `grafana-azure-monitor-datasource` | KQL queries against `AppRequests`, `AppMetrics`, and other App Insights tables |
 
 ### Pre-Built Dashboard
 
@@ -426,18 +425,17 @@ Organized into collapsible row sections:
 
 | Row Section | Panels | Data Source | Demo Value |
 |------------|--------|-------------|------------|
-| **Overview** | Request rate (by endpoint), error rate (4xx/5xx), P50/P95/P99 latency | Prometheus | Shows real-time impact when any chaos scenario is triggered |
-| **Infrastructure** | CPU usage, memory usage, container restart count, thread pool size | Prometheus + Azure Monitor | Memory leak and CPU spike scenarios create dramatic visual changes |
-| **Database** | Query latency histogram, active connections gauge, error rate by type | Prometheus (`contosobank_db_*`) | DB connection failure scenario shows connections dropping to zero |
-| **Business** | Transfers/min (success vs failed), transaction volume, batch processing status | Prometheus (`contosobank_transfers_*`) | HTTP 500 and exception storm scenarios show business impact |
+| **Overview** | Request rate (by endpoint), error rate (4xx/5xx), P50/P95/P99 latency | Log Analytics (`AppRequests`) | Shows real-time impact when any chaos scenario is triggered |
+| **Infrastructure** | CPU usage, memory usage, GC collections, thread pool size | Log Analytics (`AppMetrics`) | Memory leak and CPU spike scenarios create dramatic visual changes |
+| **Database** | Active connections gauge, error rate by type, dependency timeouts | Log Analytics (`AppMetrics` — `contosobank.db.*`) | DB connection failure scenario shows connections dropping to zero |
+| **Business** | Transfers/min (success vs failed), transaction volume, exceptions & log volume | Log Analytics (`AppMetrics` — `contosobank.*`) | HTTP 500 and exception storm scenarios show business impact |
 
 ### Dashboard JSON Structure
 
 The dashboard JSON lives at `grafana/dashboards/contoso-bank.json` and includes:
 - Collapsible row panels grouping related metrics (Overview, Infrastructure, Database, Business)
-- Panel definitions with PromQL queries targeting `contosobank_*` and `process_*` metrics
-- Variable templates (for environment/namespace filtering)
-- Alert thresholds matching the Azure Monitor alert rules
+- Panel definitions with **KQL queries** against `AppRequests` and `AppMetrics` tables in Log Analytics
+- Variable templates (data source selector)
 - Time range defaults optimized for demo visibility (last 15 minutes)
 
 ---
@@ -523,10 +521,9 @@ Each scheduled query rule specifies:
 | Container App | `modules/container-app.bicep` | The Contoso Bank app |
 | Azure SQL Server + DB | `modules/sql.bicep` | Application database |
 | Application Insights | `modules/monitoring.bicep` | APM + telemetry |
-| Log Analytics Workspace | `modules/monitoring.bicep` | Log aggregation |
-| Azure Monitor Workspace | `modules/prometheus.bicep` | Managed Prometheus + scrape config for Container App |
-| Azure Managed Grafana | `modules/grafana.bicep` | Dashboards + MCP endpoint for SRE Agent |
-| Data Collection Rule | `modules/prometheus.bicep` | Routes Prometheus metrics from Container App → Monitor Workspace |
+| Log Analytics Workspace | `modules/monitoring.bicep` | Log aggregation + App Insights data store |
+| Azure Monitor Workspace | `modules/monitor-workspace.bicep` | Metrics backend for Grafana integration |
+| Azure Managed Grafana | `modules/grafana.bicep` | Dashboards (KQL) + MCP endpoint for SRE Agent |
 | Alert Rules + Action Group | `modules/alerts.bicep` | 10 pre-configured alerts mapped to all 8 chaos scenarios (see [Azure Monitor Alert Rules](#azure-monitor-alert-rules) section) |
 | Managed Identity | `modules/identity.bicep` | RBAC for app + monitoring + Grafana Admin |
 
@@ -540,12 +537,12 @@ azd down  # Tears it all down
 ### Post-Provisioning Script
 
 Automated by `scripts/post-provision.sh`:
-- Seeds the database with sample accounts and transactions
-- Configures Grafana data sources (Prometheus, Azure Monitor, Log Analytics)
-- Imports the Grafana dashboard JSON
-- Configures Prometheus scraping for the Container App `/metrics` endpoint
-- Outputs the Grafana MCP endpoint URL for SRE Agent connector setup
-- Assigns `Grafana Admin` role to the deployment identity
+- Grants managed identity SQL database access
+- Configures Grafana data sources (Managed Prometheus, Azure Monitor, Log Analytics) via Azure CLI
+- Replaces deprecated core Prometheus data source with `grafana-azureprometheus-datasource` plugin
+- Imports the Grafana dashboard JSON (`grafana/dashboards/contoso-bank.json`)
+- Configures App Insights OpenTelemetry agent on the Container Apps Environment
+- Outputs the Grafana MCP endpoint URL and SRE Agent connector setup instructions
 
 ---
 
@@ -556,7 +553,7 @@ The `ChaosService` is registered as a singleton in DI. It provides methods that 
 1. **Activates the failure** (e.g., starts memory allocation, sets error flag)
 2. **Auto-recovers after a configurable duration** (default: 5 minutes) — so the demo can be repeated
 3. **Records activation in logs** with structured logging (so SRE Agent can find root cause in code)
-4. **Increments Prometheus counters** for each chaos type activated
+4. **Increments metrics counters** for each chaos type activated
 
 ```csharp
 public interface IChaosService
@@ -643,8 +640,8 @@ contoso-bank/
 │       ├── container-app.bicep         # The Contoso Bank Container App
 │       ├── sql.bicep                   # Azure SQL Server + Database
 │       ├── monitoring.bicep            # App Insights + Log Analytics workspace
-│       ├── prometheus.bicep            # Azure Monitor Workspace + Data Collection Rule
-│       ├── grafana.bicep               # Azure Managed Grafana + data sources
+│       ├── monitor-workspace.bicep    # Azure Monitor Workspace (metrics backend for Grafana)
+│       ├── grafana.bicep               # Azure Managed Grafana + RBAC
 │       ├── alerts.bicep                # Azure Monitor alert rules
 │       └── identity.bicep              # Managed Identity + RBAC assignments
 ├── src/
@@ -788,8 +785,8 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 |---|------|-------------|
 | 13 | **Build Grafana dashboard JSON** | Single consolidated dashboard in `grafana/dashboards/contoso-bank.json` with collapsible row sections: Overview, Infrastructure, Database, Business. PromQL queries targeting `contosobank_*` and `process_*` metrics. Variable templates for environment filtering. 15-minute default time range. |
 | 13t | **Test: dashboard JSON validity** | Validate the JSON file parses correctly and contains required Grafana schema fields (`panels`, `title`, `templating`, `time`). Script or unit test. |
-| 14 | **Deploy and validate Grafana dashboard** | Deploy the dashboard JSON from `grafana/dashboards/contoso-bank.json` to a running Grafana instance. Validate all panels render, PromQL queries resolve, collapsible row sections (Overview, Infrastructure, Database, Business) work, variable templates filter correctly, and 15-minute default time range is applied. Iterate until the dashboard is complete and production-ready. |
-| 15 | **Write post-provision script (Grafana)** | `scripts/post-provision.sh` — runs after `azd provision`: configures Grafana data sources (Prometheus, Azure Monitor, Log Analytics) via API, imports dashboard JSON, assigns `Grafana Admin` role to the deployment identity, configures Prometheus scraping for the Container App `/metrics` endpoint, outputs Grafana MCP URL. |
+| 14 | **Deploy and validate Grafana dashboard** | Deploy the dashboard JSON from `grafana/dashboards/contoso-bank.json` to a running Grafana instance. Validate all panels render, KQL queries resolve against `AppRequests`/`AppMetrics` tables, collapsible row sections (Overview, Infrastructure, Database, Business) work, variable templates filter correctly, and 15-minute default time range is applied. Iterate until the dashboard is complete and production-ready. |
+| 15 | **Write post-provision script (Grafana)** | `scripts/post-provision.sh` — runs after `azd provision`: grants managed identity SQL access, configures Grafana data sources (Managed Prometheus, Azure Monitor, Log Analytics) via `az grafana` CLI, replaces deprecated Prometheus data source plugin, imports dashboard JSON, configures App Insights OTel agent on Container Apps Environment, outputs Grafana MCP URL and SRE Agent connector setup instructions. |
 | 16 | **Write database seed script** | `scripts/seed-data.sql` — realistic banking data: 5 accounts (2 checking, 1 savings, 1 credit, 1 business), 100+ transactions across 30 days, 10+ recent transfers. |
 | 17 | **Update post-provision script (database)** | Update `scripts/post-provision.sh` to also execute the SQL seed script against Azure SQL Database after provisioning. |
 
@@ -811,6 +808,7 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 | **Azure Container Apps** (not App Service/AKS) | SRE Agent has deep Container Apps diagnostics, simpler than AKS, cheaper than App Service for demo |
 | **Azure SQL** (not Cosmos DB) | Familiar relational model for banking, EF Core first-class support, easy to demonstrate connection failure chaos |
 | **Managed Grafana** (not self-hosted) | Built-in MCP endpoint, no infra to manage, Azure RBAC integration, deployed via Bicep |
+| **KQL dashboard queries** (not PromQL) | Azure Monitor Managed Prometheus does not support scraping Container Apps (AKS only); App Insights via `UseAzureMonitor()` provides all metrics, queried via KQL against `AppRequests`/`AppMetrics` tables in Log Analytics |
 | **Singleton ChaosService** (not middleware/feature flags) | Fine-grained control per scenario, auto-recovery timers, status tracking, doesn't pollute middleware pipeline |
 | **5-minute auto-recovery** | Demo can be repeated without manual cleanup; long enough for SRE Agent to detect and investigate |
 | **Built-in health checks** (not custom HealthController) | Integrates with Container Apps liveness/readiness probes, standard ASP.NET Core pattern, supports DB readiness via `AddDbContextCheck` |

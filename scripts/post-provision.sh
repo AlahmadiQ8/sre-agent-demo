@@ -294,15 +294,13 @@ else
       echo "   Expected at: grafana/dashboards/contoso-bank.json"
     fi
 
-    # --- Verify Prometheus Scraping Configuration ---
+    # --- Metrics Pipeline Summary ---
     echo ""
-    echo "Prometheus scraping configuration:"
-    echo "  ✅ Azure Monitor Workspace created (prometheus.bicep)"
-    echo "  ✅ Data Collection Rule with PrometheusForwarder configured"
-    echo "  ✅ DCR associated with Container Apps Environment"
-    echo "  ✅ Managed identity has Monitoring Metrics Publisher role"
-    echo "  ✅ Container App exposes /metrics endpoint on port 8080"
-    echo "  → Metrics will be scraped automatically after app deployment."
+    echo "Metrics pipeline:"
+    echo "  ✅ App exports metrics via UseAzureMonitor() → App Insights"
+    echo "  ✅ Azure Monitor Workspace created (monitor-workspace.bicep)"
+    echo "  ✅ Grafana dashboard queries AppRequests/AppMetrics via KQL"
+    echo "  ✅ Prometheus /metrics endpoint available for local development"
   fi
 fi
 
