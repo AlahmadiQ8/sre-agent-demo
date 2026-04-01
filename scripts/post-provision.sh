@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${SCRIPT_DIR}/.."
+
 echo "=== Contoso Bank Post-Provision ==="
 echo ""
 echo "Environment: ${AZURE_ENV_NAME:-unknown}"
@@ -37,6 +40,20 @@ if [ -n "${SQL_SERVER_FQDN:-}" ] && [ -n "${MANAGED_IDENTITY_NAME:-}" ]; then
       ALTER ROLE db_ddladmin ADD MEMBER [${MANAGED_IDENTITY_NAME}];
     " 2>/dev/null && echo "✅ Managed identity granted SQL access." \
     || echo "⚠️  Could not grant SQL access. Run manually after provisioning."
+
+  # Execute seed data script against Azure SQL Database
+  SEED_SCRIPT="${SCRIPT_DIR}/seed-data.sql"
+  if [ -f "$SEED_SCRIPT" ]; then
+    echo ""
+    echo "Seeding database with demo data..."
+    sqlcmd -S "$SQL_SERVER_FQDN" -d "${SQL_DATABASE_NAME:-contoso-bank}" \
+      --authentication-method ActiveDirectoryDefault \
+      -i "$SEED_SCRIPT" 2>/dev/null \
+      && echo "✅ Database seeded with demo data." \
+      || echo "⚠️  Could not seed database. Run manually: sqlcmd -S $SQL_SERVER_FQDN -d ${SQL_DATABASE_NAME:-contoso-bank} -i scripts/seed-data.sql"
+  else
+    echo "⚠️  Seed script not found: ${SEED_SCRIPT}"
+  fi
 
   if [ -n "$MY_IP" ]; then
     echo "Removing temporary firewall rule..."
@@ -87,8 +104,6 @@ echo ""
 echo "--- Grafana Data Sources & Dashboard ---"
 echo ""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${SCRIPT_DIR}/.."
 DASHBOARD_FILE="${REPO_ROOT}/grafana/dashboards/contoso-bank.json"
 GRAFANA_NAME="${GRAFANA_NAME:-}"
 SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
