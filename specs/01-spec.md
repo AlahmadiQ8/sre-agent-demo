@@ -795,7 +795,7 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 | # | Task | Description |
 |---|------|-------------|
 | 18 | **Write README** | Demo-delivirer documentation: prerequisites, one-command deployment, architectur (mermaid), demo scenarios walkthough, cleanup, Add PLACHOLDER section for SRE Agent that i'll fill later |
-| 19 | **End-to-end validation** | Full E2E sweep: navigate every page, trigger every chaos button, verify error states, check responsive layout on desktop + tablet, basic accessibility (heading hierarchy, form labels). Final screenshot gallery of all pages in healthy state. |
+| 19 | **End-to-end validation** | Full E2E sweep: navigate every page, trigger every chaos button, verify error states |
 
 ---
 
