@@ -12,14 +12,14 @@ All scenarios **auto-recover after 5 minutes**, so you can repeat the demo.
 
 | # | Page | Button to Click | Failure Triggered | What Audience Sees | What SRE Agent Finds |
 |---|------|----------------|-------------------|--------------------|-----------------------|
-| 1 | **Reports** | Generate Annual Statement | Memory Leak | Loading → timeout/error | Memory growth, OOM kill, `process_working_set_bytes` spike |
-| 2 | **Dashboard** | Run Fraud Detection | CPU Spike | "Scanning transactions..." | CPU > 95%, thread starvation, `process_cpu_seconds_total` spike |
+| 1 | **Reports** | Generate Annual Statement | Memory Leak | Loading → timeout/error | Memory growth, OOM kill, `dotnet.process.memory.working_set` spike |
+| 2 | **Dashboard** | Run Fraud Detection | CPU Spike | "Scanning transactions..." | CPU > 95%, thread starvation, `process.cpu.time` spike |
 | 3 | **Transfers** | Wire Transfer | HTTP 500 Errors | "Transfer failed" error | 5xx spike on `/api/transfers/wire`, exception traces |
-| 4 | **Accounts** | Refresh | DB Connection Failure | "Unable to load account information" | `SqlException` flood, `contosobank_db_errors_total` spike |
+| 4 | **Accounts** | Refresh | DB Connection Failure | "Unable to load account information" | `SqlException` flood, `contosobank.db.errors` spike |
 | 5 | **Transfers** | International Transfer | Slow API (30s delay) | Very slow loading | P99 latency spike, no CPU/memory issue → external dependency |
-| 6 | **Settings** | Verify Identity (KYC) | Dependency Timeout | "Identity verification failed" | Timeout exceptions, `contosobank_dependency_timeouts_total` |
-| 7 | **Transactions** | Export Full History | Log Flooding | "Preparing export..." → sluggish app | Log volume spike, `contosobank_log_entries_total` rockets |
-| 8 | **Reports** | Run Batch Reconciliation | Exception Storm | "Reconciliation failed" | Multiple exception types, `contosobank_exceptions_total` spike |
+| 6 | **Settings** | Verify Identity (KYC) | Dependency Timeout | "Identity verification failed" | Timeout exceptions, `contosobank.dependency.timeouts` spike |
+| 7 | **Transactions** | Export Full History | Log Flooding | "Preparing export..." → sluggish app | Log volume spike, `contosobank.log.entries` rockets |
+| 8 | **Reports** | Run Batch Reconciliation | Exception Storm | "Reconciliation failed" | Multiple exception types, `contosobank.exceptions` spike |
 
 ## Suggested Demo Flow
 

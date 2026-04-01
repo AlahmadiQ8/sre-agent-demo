@@ -90,7 +90,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= ago(5m)\n| summarize value = count() / 300.0",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize value = count() / 300.0",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -165,7 +165,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= ago(5m)\n| summarize total = count(), errors = countif(ResultCode startswith \"5\")\n| extend value = iff(total == 0, 0.0, errors * 100.0 / total)",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize total = count(), errors = countif(ResultCode startswith \"5\")\n| project error_rate = iff(total == 0, 0.0, errors * 100.0 / total)",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -238,7 +238,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= ago(5m)\n| summarize value = percentile(DurationMs, 95) / 1000.0",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize value = percentile(DurationMs, 95) / 1000.0",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -311,7 +311,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"http.server.active_requests\"\n| where TimeGenerated >= ago(5m)\n| summarize value = avg(Sum)",
+            "query": "AppMetrics\n| where Name == \"http.server.active_requests\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = avg(Sum)",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -407,7 +407,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize count = count() by bin(TimeGenerated, $__interval), Name\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize count = count() by bin(TimeGenerated, $__interval), Name\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -534,7 +534,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| where ResultCode startswith \"4\"\n| summarize count = count() by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| where ResultCode startswith \"4\"\n| summarize count = count() by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -548,7 +548,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| where ResultCode startswith \"5\"\n| summarize count = count() by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| where ResultCode startswith \"5\"\n| summarize count = count() by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -694,7 +694,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize P50 = percentile(DurationMs, 50) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize P50 = percentile(DurationMs, 50) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -708,7 +708,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize P95 = percentile(DurationMs, 95) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize P95 = percentile(DurationMs, 95) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -722,7 +722,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppRequests\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize P99 = percentile(DurationMs, 99) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where $__timeFilter(TimeGenerated)\n| summarize P99 = percentile(DurationMs, 99) / 1000.0 by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -761,7 +761,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "green",
+            "mode": "fixed"
           },
           "custom": {
             "axisBorderShow": false,
@@ -771,7 +772,7 @@
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 20,
-            "gradientMode": "scheme",
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -835,7 +836,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"process.cpu.time\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"process.cpu.time\"\n| where $__timeFilter(TimeGenerated)\n| summarize CPU = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -862,7 +863,8 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "fixedColor": "green",
+            "mode": "fixed"
           },
           "custom": {
             "axisBorderShow": false,
@@ -872,7 +874,7 @@
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 20,
-            "gradientMode": "scheme",
+            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -936,7 +938,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"dotnet.process.memory.working_set\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"dotnet.process.memory.working_set\"\n| where $__timeFilter(TimeGenerated)\n| summarize Memory = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1033,7 +1035,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"dotnet.gc.collections\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"dotnet.gc.collections\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1130,7 +1132,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"dotnet.thread_pool.thread.count\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"dotnet.thread_pool.thread.count\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = avg(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1217,7 +1219,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.db.connections.active\"\n| where TimeGenerated >= ago(5m)\n| summarize value = avg(Sum)",
+            "query": "AppMetrics\n| where Name == \"contosobank.db.connections.active\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = avg(Sum)",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1313,7 +1315,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.db.errors\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.db.errors\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1413,7 +1415,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.dependency.timeouts\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.dependency.timeouts\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1553,7 +1555,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.transfers\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| where Properties[\"status\"] == \"success\"\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.transfers\"\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"status\"] == \"success\"\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1567,7 +1569,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.transfers\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| where Properties[\"status\"] == \"failed\"\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.transfers\"\n| where $__timeFilter(TimeGenerated)\n| where Properties[\"status\"] == \"failed\"\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1665,7 +1667,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.transactions.processed\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.transactions.processed\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1762,7 +1764,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.exceptions\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.exceptions\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1776,7 +1778,7 @@
           },
           "queryType": "Azure Log Analytics",
           "azureLogAnalytics": {
-            "query": "AppMetrics\n| where Name == \"contosobank.log.entries\"\n| where TimeGenerated >= $__timeFrom and TimeGenerated < $__timeTo\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "query": "AppMetrics\n| where Name == \"contosobank.log.entries\"\n| where $__timeFilter(TimeGenerated)\n| summarize value = sum(Sum) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
             "resources": [
               "/subscriptions/33ccd01f-fc97-4fa1-b208-db8eb99a430b/resourceGroups/rg-sre-agent-demo-2/providers/Microsoft.OperationalInsights/workspaces/log-sre-agent-demo-2-fhcbdn"
             ]
@@ -1811,28 +1813,6 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": "contoso-bank",
-          "value": "contoso-bank"
-        },
-        "hide": 0,
-        "includeAll": false,
-        "label": "Job",
-        "multi": false,
-        "name": "job",
-        "options": [
-          {
-            "selected": true,
-            "text": "contoso-bank",
-            "value": "contoso-bank"
-          }
-        ],
-        "query": "contoso-bank",
-        "skipUrlSync": false,
-        "type": "custom"
       }
     ]
   },

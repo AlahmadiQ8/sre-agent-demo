@@ -8,7 +8,7 @@ A demo banking application for [Azure SRE Agent](https://learn.microsoft.com/en-
 graph TD
     subgraph ACA["Azure Container Apps"]
         subgraph WebApp["Contoso Bank Web App"]
-            Razor["Razor Pages<br/>(Frontend)"] -->|requests| API["ASP.NET Core Web API<br/>Controllers + Services<br/>ChaosService (DI)<br/>/metrics (Prometheus)"]
+            Razor["Razor Pages<br/>(Frontend)"] -->|requests| API["ASP.NET Core Web API<br/>Controllers + Services<br/>ChaosService (DI)"]
         end
     end
 
@@ -71,7 +71,7 @@ azd up
 1. Grants managed identity access to SQL Database
 2. Seeds the database with demo banking data
 3. Configures Container Apps OpenTelemetry agent
-4. Sets up Grafana data sources (Azure Monitor, Log Analytics, Prometheus)
+4. Sets up Grafana data sources (Azure Monitor, Log Analytics)
 5. Imports the Grafana dashboard
 6. Outputs the Grafana MCP endpoint URL and SRE Agent setup instructions
 
@@ -94,7 +94,22 @@ The app is available at `http://localhost:8080` with these endpoints:
 | `/` | Banking dashboard (home page) |
 | `/health/live` | Liveness probe (always 200) |
 | `/health/ready` | Readiness probe (checks DB connectivity) |
-| `/metrics` | Prometheus metrics (OpenTelemetry) |
+
+### Local Grafana
+
+The `grafana/` directory contains a Docker Compose setup that runs Grafana locally, connected directly to your Azure Monitor / Log Analytics workspace via managed identity — no Prometheus needed.
+
+```bash
+cd grafana
+docker compose up -d
+# Grafana is available at http://localhost:3000 (admin/admin)
+```
+
+The local Grafana instance is pre-provisioned with:
+- **Azure Monitor datasource** — authenticates via managed identity (`azureAuthType: msi`)
+- **Contoso Bank dashboard** — the same KQL-based dashboard deployed to Azure Managed Grafana
+
+All dashboard panels use `$__timeFilter(TimeGenerated)` for time range filtering, which automatically syncs queries to the Grafana dashboard time picker.
 
 ## Chaos Scenarios
 
@@ -125,11 +140,9 @@ graph TD
         Traces["ActivitySource<br/>(custom spans)"] --> OTel
 
         OTel --> AzExporter["Azure Monitor<br/>Exporter"]
-        OTel --> PromExporter["Prometheus<br/>Exporter (/metrics)"]
     end
 
     AzExporter --> AppInsights["App Insights +<br/>Log Analytics"]
-    PromExporter -.->|"local dev only"| LocalProm["Local Prometheus"]
     AppInsights -->|"KQL queries"| Grafana["Managed Grafana<br/>(dashboard)"]
     Grafana --> MCP["MCP endpoint"]
 
@@ -169,8 +182,14 @@ After deployment, `azd up` outputs the Grafana MCP endpoint URL. To connect SRE 
 ├── DEMO.md                       # Demo cheat sheet & walkthrough
 ├── ContosoBank.slnx              # Solution file
 ├── grafana/
-│   └── dashboards/
-│       └── contoso-bank.json     # Grafana dashboard (KQL panels)
+│   ├── docker-compose.yml        # Local Grafana (Azure Monitor via managed identity)
+│   ├── dashboards/
+│   │   └── contoso-bank.json     # Grafana dashboard (KQL panels)
+│   └── provisioning/
+│       ├── dashboards/
+│       │   └── default.yaml      # Dashboard provisioning config
+│       └── datasources/
+│           └── azure-monitor.yaml # Azure Monitor datasource (MSI auth)
 ├── infra/
 │   ├── main.bicep                # Main orchestration (subscription-scoped)
 │   ├── main.bicepparam           # Parameter defaults
