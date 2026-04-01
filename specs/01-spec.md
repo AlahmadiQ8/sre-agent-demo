@@ -788,15 +788,17 @@ Every phase includes its own tests (tasks suffixed with `t`). The agent should u
 |---|------|-------------|
 | 13 | **Build Grafana dashboard JSON** | Single consolidated dashboard in `grafana/dashboards/contoso-bank.json` with collapsible row sections: Overview, Infrastructure, Database, Business. PromQL queries targeting `contosobank_*` and `process_*` metrics. Variable templates for environment filtering. 15-minute default time range. |
 | 13t | **Test: dashboard JSON validity** | Validate the JSON file parses correctly and contains required Grafana schema fields (`panels`, `title`, `templating`, `time`). Script or unit test. |
-| 14 | **Write database seed script** | `scripts/seed-data.sql` — realistic banking data: 5 accounts (2 checking, 1 savings, 1 credit, 1 business), 100+ transactions across 30 days, 10+ recent transfers. |
-| 15 | **Write post-provision script** | `scripts/post-provision.sh` — runs after `azd provision`: executes SQL seed script, configures Grafana data sources via API, imports dashboard JSON, outputs Grafana MCP URL. |
+| 14 | **Deploy and validate Grafana dashboard** | Deploy the dashboard JSON from `grafana/dashboards/contoso-bank.json` to a running Grafana instance. Validate all panels render, PromQL queries resolve, collapsible row sections (Overview, Infrastructure, Database, Business) work, variable templates filter correctly, and 15-minute default time range is applied. Iterate until the dashboard is complete and production-ready. |
+| 15 | **Write post-provision script (Grafana)** | `scripts/post-provision.sh` — runs after `azd provision`: configures Grafana data sources (Prometheus, Azure Monitor, Log Analytics) via API, imports dashboard JSON, assigns `Grafana Admin` role to the deployment identity, configures Prometheus scraping for the Container App `/metrics` endpoint, outputs Grafana MCP URL. |
+| 16 | **Write database seed script** | `scripts/seed-data.sql` — realistic banking data: 5 accounts (2 checking, 1 savings, 1 credit, 1 business), 100+ transactions across 30 days, 10+ recent transfers. |
+| 17 | **Update post-provision script (database)** | Update `scripts/post-provision.sh` to also execute the SQL seed script against Azure SQL Database after provisioning. |
 
 ### Phase 7: Documentation + Final Validation
 
 | # | Task | Description |
 |---|------|-------------|
-| 16 | **Write README** | User-facing documentation: prerequisites, one-command deployment, SRE Agent connector setup guide, demo walkthrough for each scenario, troubleshooting, cleanup. |
-| 17 | **End-to-end validation** | Full E2E sweep: navigate every page, trigger every chaos button, verify error states, check responsive layout on desktop + tablet, basic accessibility (heading hierarchy, form labels). Final screenshot gallery of all pages in healthy state. |
+| 18 | **Write README** | User-facing documentation: prerequisites, one-command deployment, SRE Agent connector setup guide, demo walkthrough for each scenario, troubleshooting, cleanup. |
+| 19 | **End-to-end validation** | Full E2E sweep: navigate every page, trigger every chaos button, verify error states, check responsive layout on desktop + tablet, basic accessibility (heading hierarchy, form labels). Final screenshot gallery of all pages in healthy state. |
 
 ---
 

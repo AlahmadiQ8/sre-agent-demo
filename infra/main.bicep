@@ -74,16 +74,14 @@ module sql './modules/sql.bicep' = {
   }
 }
 
-// 5. Prometheus — Azure Monitor Workspace + DCR for /metrics scraping
-module prometheus './modules/prometheus.bicep' = {
-  name: 'prometheus'
+// 5. Azure Monitor Workspace — metrics backend for Grafana
+module monitorWorkspace './modules/monitor-workspace.bicep' = {
+  name: 'monitor-workspace'
   scope: rg
   params: {
     name: name
     location: location
     tags: tags
-    managedIdentityPrincipalId: identity.outputs.principalId
-    containerAppsEnvironmentName: containerEnv.outputs.environmentName
   }
 }
 
@@ -95,7 +93,7 @@ module grafana './modules/grafana.bicep' = {
     name: name
     location: location
     tags: tags
-    monitorWorkspaceId: prometheus.outputs.monitorWorkspaceId
+    monitorWorkspaceId: monitorWorkspace.outputs.monitorWorkspaceId
     managedIdentityPrincipalId: identity.outputs.principalId
     principalId: principalId
   }
@@ -147,5 +145,7 @@ output SQL_DATABASE_NAME string = sql.outputs.databaseName
 output MANAGED_IDENTITY_NAME string = identity.outputs.name
 output MANAGED_IDENTITY_CLIENT_ID string = identity.outputs.clientId
 output GRAFANA_ENDPOINT string = grafana.outputs.endpoint
+output GRAFANA_NAME string = grafana.outputs.grafanaName
 output GRAFANA_MCP_ENDPOINT string = grafana.outputs.mcpEndpoint
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.logAnalyticsWorkspaceId
+output CONTAINER_APPS_ENVIRONMENT_NAME string = containerEnv.outputs.environmentName

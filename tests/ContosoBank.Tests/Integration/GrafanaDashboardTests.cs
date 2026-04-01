@@ -139,19 +139,19 @@ public class GrafanaDashboardTests
     {
         var json = File.ReadAllText(DashboardPath);
 
-        // Custom business/reliability metrics from BankMetrics.cs
-        Assert.Contains("contosobank_transfers_total", json);
-        Assert.Contains("contosobank_transactions_processed_total", json);
-        Assert.Contains("contosobank_db_errors_total", json);
-        Assert.Contains("contosobank_dependency_timeouts_total", json);
-        Assert.Contains("contosobank_exceptions_total", json);
-        Assert.Contains("contosobank_log_entries_total", json);
-        Assert.Contains("contosobank_db_connections_active", json);
+        // Custom business/reliability metrics from BankMetrics.cs (Azure Monitor / App Insights names)
+        Assert.Contains("contosobank.transfers", json);
+        Assert.Contains("contosobank.transactions.processed", json);
+        Assert.Contains("contosobank.db.errors", json);
+        Assert.Contains("contosobank.dependency.timeouts", json);
+        Assert.Contains("contosobank.exceptions", json);
+        Assert.Contains("contosobank.log.entries", json);
+        Assert.Contains("contosobank.db.connections.active", json);
 
-        // Auto-instrumented metrics
-        Assert.Contains("http_server_request_duration_seconds", json);
-        Assert.Contains("process_cpu_seconds_total", json);
-        Assert.Contains("process_working_set_bytes", json);
+        // Auto-instrumented metrics (Azure Monitor / App Insights names)
+        Assert.Contains("http.server.active_requests", json);
+        Assert.Contains("process.cpu.time", json);
+        Assert.Contains("dotnet.process.memory.working_set", json);
     }
 
     [Fact]
