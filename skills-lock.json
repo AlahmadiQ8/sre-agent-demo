@@ -56,6 +56,11 @@
       "sourceType": "github",
       "computedHash": "bdfcadec9604ec0225f337ffbcecb8c8a5ddf69b6b1a1335963df97a0665472e"
     },
+    "k6-load-testing": {
+      "source": "alahmadiq8/skills",
+      "sourceType": "github",
+      "computedHash": "1bf442147e103a358c14509ea89dcb17bde27482f72f6b46515737ed3556154b"
+    },
     "msbuild-antipatterns": {
       "source": "dotnet/skills",
       "sourceType": "github",
