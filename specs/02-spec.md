@@ -1,6 +1,6 @@
 # Contoso Bank — k6 Traffic Simulation for Demo Alert Triggering
 
-> **Status: IN PROGRESS 🔧**
+> **Status: COMPLETE ✅**
 >
 > **Depends on:** `01-spec.md` (complete) — all existing chaos scenarios, API endpoints, observability pipeline, and Azure Monitor alert rules (A1–A10) are in place.
 
