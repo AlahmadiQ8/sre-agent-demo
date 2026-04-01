@@ -36,3 +36,65 @@ All scenarios **auto-recover after 5 minutes**, so you can repeat the demo.
 - **Memory Leak** (Reports → Annual Statement) — dramatic, visual in Grafana
 - **HTTP 500** (Transfers → Wire Transfer) — fast, immediate error spike
 - **Exception Storm** (Reports → Batch Reconciliation) — shows diverse exception analysis
+
+---
+
+## Traffic Simulation with k6
+
+Instead of manually clicking chaos buttons, use **k6 scripts** to automate traffic generation and reliably fire Azure Monitor alerts within 1–2 minutes.
+
+### Prerequisites
+
+```bash
+brew install k6    # macOS
+# or: go install go.k6.io/k6@latest
+```
+
+### Quick Start
+
+```bash
+# Start baseline traffic (run before demo, keep in background)
+./tests/k6/run-scenario.sh baseline --base-url https://your-app.azurecontainerapps.io
+
+# Trigger a single chaos scenario
+./tests/k6/run-scenario.sh memory-leak --base-url https://your-app.azurecontainerapps.io
+
+# Trigger all chaos scenarios sequentially
+./tests/k6/run-scenario.sh all --base-url https://your-app.azurecontainerapps.io
+
+# Cherry-pick specific scenarios
+./tests/k6/run-scenario.sh all --only http-500,db-failure --base-url https://your-app.azurecontainerapps.io
+
+# Run all except slow ones
+./tests/k6/run-scenario.sh all --disable memory-leak,slow-api --base-url https://your-app.azurecontainerapps.io
+
+# Preview what would run
+./tests/k6/run-scenario.sh all --only http-500,slow-api --dry-run
+
+# List available scenarios
+./tests/k6/run-scenario.sh --list
+```
+
+### Alert-to-Scenario Mapping
+
+| Scenario | Alerts Triggered | Chaos Endpoint |
+|----------|-----------------|----------------|
+| `memory-leak` | A1 (High Memory), A2 (OOM Restart) | `POST /api/reports/annual-statement` |
+| `cpu-spike` | A3 (High CPU) | `POST /api/accounts/fraud-detection` |
+| `http-500` | A4 (HTTP 5xx) | `POST /api/transfers/wire` |
+| `db-failure` | A5 (DB Failures), A10 (Health Degraded) | `POST /api/accounts/refresh` |
+| `slow-api` | A6 (P95 Latency) | `POST /api/transfers/international` |
+| `dependency-timeout` | A7 (Dependency Timeout) | `POST /api/settings/verify-identity` |
+| `log-flood` | A8 (Log Volume) | `POST /api/transactions/export` |
+| `exception-storm` | A9 (Exception Storm) | `POST /api/reports/reconciliation` |
+
+### Recommended Demo Flow with k6
+
+1. **Start baseline traffic** — `./tests/k6/run-scenario.sh baseline --base-url <url>` (keep running in a background terminal)
+2. **Open Grafana** side-by-side — show healthy dashboard with live traffic
+3. **Open SRE Agent** (sre.azure.com) — show it's monitoring
+4. **Trigger a scenario** — `./tests/k6/run-scenario.sh http-500 --base-url <url>`
+5. **Watch the script output** — shows which alerts to expect
+6. **Watch Grafana** — see metrics change in real-time
+7. **Watch SRE Agent** — see it detect, investigate, and correlate
+8. **Repeat** with `--only` to trigger additional scenarios
