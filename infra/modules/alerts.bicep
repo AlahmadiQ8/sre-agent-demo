@@ -44,7 +44,7 @@ resource a1HighMemory 'Microsoft.Insights/metricAlerts@2018-03-01' = {
           metricName: 'WorkingSetBytes'
           metricNamespace: 'microsoft.app/containerapps'
           operator: 'GreaterThan'
-          threshold: 1717986918 // ~80% of 2 GiB
+          threshold: 594706704 // ~600MB
           timeAggregation: 'Average'
           criterionType: 'StaticThresholdCriterion'
         }
@@ -78,7 +78,7 @@ resource a3HighCpu 'Microsoft.Insights/metricAlerts@2018-03-01' = {
           metricName: 'UsageNanoCores'
           metricNamespace: 'microsoft.app/containerapps'
           operator: 'GreaterThan'
-          threshold: 900000000 // 90% of 1 core in nanocores
+          threshold: 500000000 // 50% of 1 core in nanocores
           timeAggregation: 'Average'
           criterionType: 'StaticThresholdCriterion'
         }
