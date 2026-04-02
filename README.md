@@ -150,20 +150,41 @@ graph TD
 
 ## Azure SRE Agent Setup
 
-<!-- TODO: Fill in SRE Agent configuration steps -->
-
-> **This section is a placeholder.** Add SRE Agent connector configuration, investigation workflows, and mitigation setup instructions here.
-
 ### Grafana MCP Connector
 
-After deployment, `azd up` outputs the Grafana MCP endpoint URL. To connect SRE Agent:
+Every Azure Managed Grafana instance exposes a built-in MCP endpoint at `/api/azure-mcp` ([docs](https://github.com/Azure/azure-managed-grafana/blob/main/amg-mcp.md)). After `azd up`, find your endpoint:
+
+```bash
+# Get the Grafana MCP endpoint from azd environment
+azd env get-value GRAFANA_MCP_ENDPOINT
+# Example: https://graf-<name>.cse.grafana.azure.com/api/azure-mcp
+```
+
+#### Authentication: Grafana Service Account Token (Recommended)
+
+Use a Grafana service account token for a **one-time setup** that doesn't expire:
+
+1. Open your Grafana instance (get the URL with `azd env get-value GRAFANA_ENDPOINT`)
+2. Navigate to **Administration → Service accounts**
+3. Create a new service account with **Viewer** role
+4. Click **Add token** → generate a token (format: `glsa_xxx`)
+5. Copy the token — you'll use it in the connector config below
+
+> **Alternative:** Use an Entra ID token for short-lived access (expires in ~1 hour):
+> ```bash
+> az account get-access-token --resource ce34e7e5-485f-4d76-964f-b3d2b16d1e4f --query accessToken -o tsv
+> ```
+
+#### Connect SRE Agent
 
 1. Go to [sre.azure.com](https://sre.azure.com) → **Builder** → **Connectors**
 2. Click **+ Add connector** → **MCP Server**
-3. Enter the MCP URL from the deployment output
-4. Auth: **Managed Identity**
+3. Enter the MCP URL from `azd env get-value GRAFANA_MCP_ENDPOINT`
+4. Auth: **Bearer token** — paste the Grafana service account token (`glsa_xxx`)
 5. Select tools → **Select all**
 6. Save — status should show **Connected**
+
+Through this MCP endpoint, SRE Agent gets access to tools like `amgmcp_query_resource_log`, `amgmcp_insights_get_failures`, `amgmcp_prometheus_query`, and more — enabling it to query App Insights, Log Analytics, and Azure Monitor metrics directly via Grafana.
 
 ### Investigation Workflows
 
