@@ -254,17 +254,6 @@ azd down --force --purge
 
 This deletes the resource group and all resources within it, including the SQL database, Container App, Grafana instance, and all monitoring data.
 
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `azd up` fails on SQL firewall | Your IP may have changed. Re-run `azd up` — the post-provision script adds a temporary firewall rule. |
-| Grafana shows "No data" | Wait 2–3 minutes after deployment for telemetry to flow. Verify App Insights connection string is set on the Container App. |
-| Container restarts in a loop | Check container logs: `az containerapp logs show --name <app> --resource-group <rg>`. Common cause: missing SQL connection string. |
-| Health check fails (`/health/ready`) | Database connectivity issue. Verify SQL Server firewall rules and managed identity access. |
-| Chaos scenario doesn't auto-recover | Each scenario has a 5-minute timer. Wait for auto-recovery or restart the Container App. |
-| `sqlcmd` not found during post-provision | Install [sqlcmd](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility): `brew install sqlcmd` (macOS) or `apt-get install mssql-tools` (Linux). |
-
 ## License
 
 This project is for demonstration purposes. See [LICENSE](LICENSE) for details.
