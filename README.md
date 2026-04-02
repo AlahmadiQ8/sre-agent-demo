@@ -109,8 +109,6 @@ The local Grafana instance is pre-provisioned with:
 - **Azure Monitor datasource** — authenticates via managed identity (`azureAuthType: msi`)
 - **Contoso Bank dashboard** — the same KQL-based dashboard deployed to Azure Managed Grafana
 
-All dashboard panels use `$__timeFilter(TimeGenerated)` for time range filtering, which automatically syncs queries to the Grafana dashboard time picker.
-
 ## Chaos Scenarios
 
 The demo includes **8 distinct failure scenarios**, each triggered by a natural-looking banking action. Every scenario auto-recovers after 5 minutes so the demo can be repeated without manual cleanup.
