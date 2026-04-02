@@ -107,7 +107,7 @@ resource a2OomRestart 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 1
     enabled: true
     scopes: [logAnalyticsWorkspaceId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -139,7 +139,7 @@ resource a4Http5xx 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview' =
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -171,7 +171,7 @@ resource a5DbFailures 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -179,7 +179,7 @@ resource a5DbFailures 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
           query: 'dependencies | where type == "SQL" and success == false'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 5
+          threshold: 2
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -203,7 +203,7 @@ resource a6HighLatency 'Microsoft.Insights/scheduledQueryRules@2023-03-15-previe
     severity: 2
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -235,7 +235,7 @@ resource a7DepTimeout 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
     severity: 2
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -243,7 +243,7 @@ resource a7DepTimeout 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview
           query: 'dependencies | where success == false and duration > 30000'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 3
+          threshold: 1
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -267,7 +267,7 @@ resource a8LogVolume 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview'
     severity: 3
     enabled: true
     scopes: [logAnalyticsWorkspaceId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -275,7 +275,7 @@ resource a8LogVolume 'Microsoft.Insights/scheduledQueryRules@2023-03-15-preview'
           query: 'ContainerAppConsoleLogs | where ContainerAppName == \'${containerAppName}\''
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 5000
+          threshold: 1000
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -299,7 +299,7 @@ resource a9ExceptionSpike 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pre
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -307,7 +307,7 @@ resource a9ExceptionSpike 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pre
           query: 'exceptions'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 50
+          threshold: 10
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -331,7 +331,7 @@ resource a10HealthDegraded 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
     severity: 1
     enabled: true
     scopes: [appInsightsId]
-    evaluationFrequency: 'PT5M'
+    evaluationFrequency: 'PT1M'
     windowSize: 'PT5M'
     criteria: {
       allOf: [
@@ -339,7 +339,7 @@ resource a10HealthDegraded 'Microsoft.Insights/scheduledQueryRules@2023-03-15-pr
           query: 'requests | where name has "health" and toint(resultCode) != 200'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 3
+          threshold: 1
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
