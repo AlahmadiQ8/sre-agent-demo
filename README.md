@@ -1,6 +1,21 @@
 # Contoso Bank — Azure SRE Agent Demo
 
+**Languages:** English | [العربية](#العربية-arabic)
+
 A demo banking application for [Azure SRE Agent](https://learn.microsoft.com/en-us/azure/sre-agent/overview). Failure scenarios are embedded into normal banking workflows — clicking buttons like "Generate Annual Statement" or "Run Fraud Detection" silently triggers realistic production issues (memory leaks, CPU spikes, HTTP 500s, etc.) that SRE Agent can detect, investigate, and mitigate.
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Chaos Scenarios](#chaos-scenarios)
+- [Azure SRE Agent Setup](#azure-sre-agent-setup)
+- [Project Structure](#project-structure)
+- [Running Tests](#running-tests)
+- [Cleanup](#cleanup)
+- [License](#license)
+
 
 ## Architecture
 
@@ -188,11 +203,60 @@ Through this MCP endpoint, SRE Agent gets access to tools like `amgmcp_query_res
 
 ### Investigation Workflows
 
-<!-- TODO: Document SRE Agent investigation workflows for each chaos scenario -->
+Once connected, SRE Agent (and any engineer using Grafana) can investigate each scenario by following the telemetry trail. Every chaos action emits a distinctive combination of an Azure Monitor alert (`A1`–`A10`), a custom metric, and structured logs. The activation/recovery of each scenario is also logged via `ChaosScenario activated` / `ChaosScenario recovered` warnings, which act as ground-truth markers when correlating signals.
+
+| Scenario | Alert(s) | Primary Signal | Distinguishing Clue |
+|----------|----------|----------------|---------------------|
+| Memory Leak | A1 (High Memory), A2 (OOM Restart) | `dotnet.process.memory.working_set` climbs steadily | Memory grows without leveling off; ends in container restart |
+| CPU Spike | A3 (High CPU) | `process.cpu.time` pinned > 95% | CPU saturated while memory stays flat |
+| HTTP 500 Errors | A4 (HTTP 5xx) | 5xx rate on `/api/transfers/wire` | `InvalidOperationException` traces on a single endpoint |
+| DB Connection Failure | A5 (DB Failures), A10 (Health Degraded) | `contosobank.db.errors` spike | `/health/ready` flips to unhealthy; DB query errors flood |
+| Slow API (30s) | A6 (P95 Latency) | P95/P99 latency spike on `/api/transfers/international` | Latency high but CPU **and** memory normal → external dependency |
+| Dependency Timeout | A7 (Dependency Timeout) | `contosobank.dependency.timeouts` spike | Timeout exceptions tagged `dependency=kyc_provider` |
+| Log Flooding | A8 (Log Volume) | `contosobank.log.entries` rockets (~1000/s) | Sudden flood of `Debug`-level `Transaction batch item` logs |
+| Exception Storm | A9 (Exception Storm) | `contosobank.exceptions` spike (~20/s) | **Multiple** exception types appear together (Null/Argument/DivideByZero/Format) |
+
+**Suggested investigation steps for SRE Agent:**
+
+1. **Start from the alert.** The firing alert (`A1`–`A10`) narrows the problem class immediately. Use the [Alert-to-Scenario Mapping](DEMO.md#alert-to-scenario-mapping) to identify the likely trigger.
+2. **Confirm with metrics.** Query the custom `ContosoBank` meter (e.g. `contosobank.exceptions`, `contosobank.db.errors`) or platform metrics (`process.cpu.time`, `dotnet.process.memory.working_set`) to confirm the signature.
+3. **Correlate logs.** Search Log Analytics for the matching exception type or the `ChaosScenario activated` warning to pinpoint the start time and affected component.
+4. **Differentiate look-alikes.** Slow API vs. CPU/Memory issues all surface as a degraded user experience — the distinguishing factor is *which* resource is saturated (see the "Distinguishing Clue" column above).
+
+Example KQL to find the exact moment a scenario was triggered:
+
+```kusto
+AppTraces
+| where Message startswith "ChaosScenario activated"
+| project TimeGenerated, Message
+| order by TimeGenerated desc
+```
 
 ### Mitigation Playbooks
 
-<!-- TODO: Document automated mitigation actions SRE Agent can take -->
+Every chaos scenario in this demo is **self-healing**: it activates a `CancellationTokenSource` with a 5-minute timeout (`DefaultDuration`), after which the scenario automatically deactivates and logs `ChaosScenario recovered`. This makes the demo safe to repeat without manual cleanup, and lets SRE Agent observe a full detect → investigate → resolve lifecycle.
+
+| Scenario | Auto-Recovery Behavior | Manual Mitigation |
+|----------|------------------------|-------------------|
+| Memory Leak | Held byte arrays are released after 5 min, **but GC may not reclaim them until the process restarts** | Restart the container revision (see below) |
+| CPU Spike | CPU loops stop after 5 min | None required |
+| HTTP 500 Errors | Error injection stops after 5 min | None required |
+| DB Connection Failure | DB interceptor stops blocking after 5 min; `/health/ready` recovers | None required |
+| Slow API | Latency injection stops after 5 min | None required |
+| Dependency Timeout | Timeout injection stops after 5 min | None required |
+| Log Flooding | Log generation stops after 5 min | None required |
+| Exception Storm | Exception loop stops after 5 min | None required |
+
+**Guaranteed clean reset.** Because a memory leak can persist until the process restarts, restart the Container App revision to force a fully clean state (replace `rg-sre-agent-demo-2` with your own resource group name):
+
+```bash
+RG_NAME=rg-sre-agent-demo-2   # replace with your resource group
+APP=$(az containerapp list -g $RG_NAME --query "[0].name" -o tsv)
+az containerapp revision restart -g $RG_NAME -n $APP \
+  --revision $(az containerapp revision list -g $RG_NAME -n $APP --query "[?properties.active].name | [0]" -o tsv)
+```
+
+> 💡 In a real incident, SRE Agent would propose a mitigation (e.g. scale out, restart the revision, roll back a deployment) and ask for approval before acting. This demo's auto-recovery simulates the "resolved" state so you can showcase the full agent workflow end-to-end. See [DEMO.md](DEMO.md#resetting-the-app-after-a-demo) for the full reset procedure.
 
 ## Project Structure
 
@@ -257,3 +321,111 @@ This deletes the resource group and all resources within it, including the SQL d
 ## License
 
 This project is for demonstration purposes. See [LICENSE](LICENSE) for details.
+
+---
+
+<div dir="rtl">
+
+## العربية (Arabic)
+
+# كونتوسو بنك — عرض توضيحي لوكيل Azure SRE
+
+تطبيق مصرفي توضيحي خاص بـ [وكيل Azure SRE](https://learn.microsoft.com/en-us/azure/sre-agent/overview). تم تضمين سيناريوهات الأعطال داخل مهام مصرفية اعتيادية — فعند النقر على أزرار مثل "إنشاء كشف حساب سنوي" أو "تشغيل كشف الاحتيال" يتم تشغيل مشكلات إنتاجية واقعية بصمت (تسريبات الذاكرة، وارتفاعات استهلاك المعالج، وأخطاء HTTP 500، وغيرها) يستطيع وكيل SRE اكتشافها والتحقيق فيها ومعالجتها.
+
+### المعمارية
+
+يعمل التطبيق على **Azure Container Apps** ويتكوّن من واجهة أمامية مبنية بـ Razor Pages تتواصل مع واجهة برمجة تطبيقات ASP.NET Core Web API. ترسل الواجهة الخلفية بيانات القياس (السجلات والمقاييس والتتبع) عبر OpenTelemetry إلى **Application Insights + Log Analytics**، وتُخزّن بياناتها في **قاعدة بيانات Azure SQL**. تُعرض لوحات المعلومات عبر **Azure Managed Grafana** التي توفّر أيضًا نقطة نهاية MCP يستخدمها وكيل SRE.
+
+### المكوّنات التقنية
+
+| الطبقة | التقنية | خدمة Azure |
+|-------|-----------|---------------|
+| الواجهة الأمامية | ASP.NET Core Razor Pages | — |
+| الواجهة الخلفية | ASP.NET Core Web API (‏C# / ‏.NET 10) | Azure Container Apps |
+| قاعدة البيانات | Entity Framework Core | Azure SQL Database |
+| المراقبة | OpenTelemetry SDK (سجلات، مقاييس، تتبع) | App Insights + Log Analytics |
+| لوحات المعلومات | Azure Managed Grafana (‏KQL) | Grafana + نقطة نهاية MCP |
+| البنية التحتية كشيفرة | Bicep + Azure Developer CLI (`azd`) | نشر بأمر واحد |
+
+### المتطلبات المسبقة
+
+- [‏Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd) الإصدار 1.9 أو أحدث
+- [‏Azure CLI (`az`)](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) الإصدار 2.60 أو أحدث
+- [‏.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [‏Docker Desktop](https://www.docker.com/products/docker-desktop/) (لبناء الحاويات محليًا)
+- اشتراك Azure مع صلاحيات إنشاء الموارد (‏Contributor + User Access Administrator)
+
+### البدء السريع
+
+#### النشر بأمر واحد
+
+```bash
+# استنساخ المستودع
+git clone https://github.com/<org>/sre-agent-demo.git
+cd sre-agent-demo
+
+# نشر كل شيء (البنية التحتية + التطبيق + المراقبة + لوحات المعلومات)
+azd up
+```
+
+يقوم الأمر `azd up` بتجهيز جميع موارد Azure، وبناء الحاوية ونشرها، وتشغيل سكربت ما بعد التجهيز الذي يمنح الهوية المُدارة صلاحية الوصول إلى قاعدة البيانات، ويملأ البيانات التجريبية، ويهيّئ Grafana، ويعرض نقطة نهاية MCP الخاصة بـ Grafana وتعليمات إعداد وكيل SRE.
+
+#### التطوير المحلي
+
+```bash
+# البناء والتشغيل محليًا (يستخدم قاعدة بيانات EF Core داخل الذاكرة)
+cd src/ContosoBank
+dotnet run
+```
+
+يتوفّر التطبيق على العنوان `http://localhost:8080`، ويوفّر نقاط النهاية `/health/live` (فحص الحيوية) و`/health/ready` (فحص الجاهزية واتصال قاعدة البيانات).
+
+### سيناريوهات الأعطال (‏Chaos)
+
+يتضمّن العرض **8 سيناريوهات أعطال مختلفة**، يُشغَّل كل منها عبر إجراء مصرفي يبدو طبيعيًا. يتعافى كل سيناريو تلقائيًا بعد 5 دقائق حتى يمكن تكرار العرض دون تنظيف يدوي.
+
+| # | السيناريو | الصفحة ← الزر | ما الذي يتعطّل |
+|---|----------|--------------|----------------|
+| 1 | **تسريب الذاكرة** | التقارير ← "إنشاء كشف حساب سنوي" | تخصيص مصفوفات بايت كبيرة يؤدي إلى إنهاء بسبب نفاد الذاكرة |
+| 2 | **ارتفاع استهلاك المعالج** | لوحة المعلومات ← "تشغيل كشف الاحتيال" | حسابات تجزئة مكثّفة تُشبع جميع الأنوية |
+| 3 | **أخطاء HTTP 500** | التحويلات ← "تحويل برقي" | استثناء `InvalidOperationException` في كل طلب |
+| 4 | **فشل اتصال قاعدة البيانات** | الحسابات ← "تحديث" | معترض يحظر جميع استعلامات قاعدة البيانات |
+| 5 | **واجهة برمجة بطيئة (30 ثانية)** | التحويلات ← "تحويل دولي" | تأخير `Task.Delay(30s)` في مسار التحويل |
+| 6 | **انتهاء مهلة الاعتمادية** | الإعدادات ← "التحقق من الهوية (‏KYC)" | استدعاء لعنوان IP غير قابل للتوجيه واستنفاد تجمّع المهام |
+| 7 | **إغراق السجلات** | المعاملات ← "تصدير السجل الكامل" | آلاف السجلات المفصّلة في الثانية |
+| 8 | **عاصفة الاستثناءات** | التقارير ← "تشغيل تسوية الدُفعات" | مهام متوازية ترمي أنواعًا متعددة من الاستثناءات |
+
+### إعداد وكيل Azure SRE
+
+تعرض كل نسخة من Azure Managed Grafana نقطة نهاية MCP مدمجة على المسار `/api/azure-mcp`. بعد تشغيل `azd up`، احصل على نقطة النهاية الخاصة بك:
+
+```bash
+azd env get-value GRAFANA_MCP_ENDPOINT
+```
+
+يُنصح باستخدام رمز حساب خدمة Grafana للحصول على إعداد يتم لمرة واحدة ولا تنتهي صلاحيته. من خلال نقطة نهاية MCP هذه يحصل وكيل SRE على إمكانية الاستعلام عن App Insights و Log Analytics ومقاييس Azure Monitor مباشرةً عبر Grafana.
+
+> 📋 راجع [DEMO.md](DEMO.md) للحصول على شرح تفصيلي للعرض التوضيحي والتدفق المقترح.
+
+### تشغيل الاختبارات
+
+```bash
+dotnet test
+```
+
+تستخدم الاختبارات `WebApplicationFactory` مع موفّر EF Core داخل الذاكرة، ولا تتطلّب أي اعتماديات خارجية.
+
+### إزالة الموارد
+
+```bash
+# إزالة جميع موارد Azure
+azd down --force --purge
+```
+
+يؤدي ذلك إلى حذف مجموعة الموارد وكل ما بداخلها، بما في ذلك قاعدة بيانات SQL وتطبيق الحاوية ونسخة Grafana وجميع بيانات المراقبة.
+
+### الترخيص
+
+هذا المشروع لأغراض العرض التوضيحي. راجع [LICENSE](LICENSE) لمزيد من التفاصيل.
+
+</div>
