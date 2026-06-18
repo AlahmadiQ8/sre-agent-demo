@@ -245,12 +245,13 @@ Every chaos scenario in this demo is **self-healing**: it activates a `Cancellat
 | Log Flooding | Log generation stops after 5 min | None required |
 | Exception Storm | Exception loop stops after 5 min | None required |
 
-**Guaranteed clean reset.** Because a memory leak can persist until the process restarts, restart the Container App revision to force a fully clean state:
+**Guaranteed clean reset.** Because a memory leak can persist until the process restarts, restart the Container App revision to force a fully clean state (replace `rg-sre-agent-demo-2` with your own resource group name):
 
 ```bash
-APP=$(az containerapp list -g rg-sre-agent-demo-2 --query "[0].name" -o tsv)
-az containerapp revision restart -g rg-sre-agent-demo-2 -n $APP \
-  --revision $(az containerapp revision list -g rg-sre-agent-demo-2 -n $APP --query "[?properties.active].name | [0]" -o tsv)
+RG_NAME=rg-sre-agent-demo-2   # replace with your resource group
+APP=$(az containerapp list -g $RG_NAME --query "[0].name" -o tsv)
+az containerapp revision restart -g $RG_NAME -n $APP \
+  --revision $(az containerapp revision list -g $RG_NAME -n $APP --query "[?properties.active].name | [0]" -o tsv)
 ```
 
 > 💡 In a real incident, SRE Agent would propose a mitigation (e.g. scale out, restart the revision, roll back a deployment) and ask for approval before acting. This demo's auto-recovery simulates the "resolved" state so you can showcase the full agent workflow end-to-end. See [DEMO.md](DEMO.md#resetting-the-app-after-a-demo) for the full reset procedure.
