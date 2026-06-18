@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contoso Bank — Azure SRE Agent Demo</title>
+    <meta name="description" content="A demo banking application for Azure SRE Agent. Realistic chaos scenarios embedded in normal banking workflows that SRE Agent can detect, investigate, and mitigate.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏦</text></svg>">
+    <style>
+        :root {
+            --navy-900: #0c1b2e;
+            --navy-800: #132d4a;
+            --navy-700: #1a3f66;
+            --blue-500: #2563eb;
+            --blue-600: #1d4ed8;
+            --blue-50: #eff6ff;
+            --gray-50: #f8f9fb;
+            --gray-100: #f1f3f5;
+            --gray-200: #e2e6ea;
+            --gray-300: #d1d5db;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+            --green-500: #10b981;
+            --amber-500: #f59e0b;
+            --red-500: #ef4444;
+            --radius: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+            --transition: 200ms ease;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { font-size: 16px; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+        }
+        a { color: var(--blue-600); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+        /* ---------- Top Nav ---------- */
+        header.nav {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(12,27,46,.92);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(255,255,255,.08);
+        }
+        .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 1.15rem; letter-spacing: -.01em; }
+        .brand:hover { text-decoration: none; }
+        .brand .logo { width: 30px; height: 30px; }
+        .nav-links { display: flex; align-items: center; gap: 28px; }
+        .nav-links a { color: rgba(255,255,255,.72); font-size: .92rem; font-weight: 500; }
+        .nav-links a:hover { color: #fff; text-decoration: none; }
+        .nav-cta {
+            background: var(--blue-500); color: #fff !important;
+            padding: 8px 18px; border-radius: var(--radius); font-weight: 600;
+        }
+        .nav-cta:hover { background: var(--blue-600); }
+
+        /* ---------- Hero ---------- */
+        .hero {
+            background: linear-gradient(165deg, var(--navy-900) 0%, var(--navy-800) 55%, var(--navy-700) 100%);
+            color: #fff;
+            padding: 88px 0 96px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::after {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% -10%, rgba(37,99,235,.35), transparent 60%);
+            pointer-events: none;
+        }
+        .hero .container { position: relative; z-index: 1; }
+        .badge-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16);
+            color: rgba(255,255,255,.9); font-size: .8rem; font-weight: 600;
+            padding: 6px 14px; border-radius: 999px; margin-bottom: 24px;
+            text-transform: uppercase; letter-spacing: .05em;
+        }
+        .hero h1 { font-size: 3rem; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; margin-bottom: 20px; }
+        .hero h1 .accent { color: #60a5fa; }
+        .hero p.sub { font-size: 1.2rem; color: rgba(255,255,255,.78); max-width: 720px; margin: 0 auto 36px; }
+        .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 13px 26px; border-radius: var(--radius);
+            font-size: .95rem; font-weight: 600; transition: all var(--transition);
+            border: 1px solid transparent;
+        }
+        .btn:hover { text-decoration: none; }
+        .btn-primary { background: var(--blue-500); color: #fff; }
+        .btn-primary:hover { background: var(--blue-600); transform: translateY(-1px); }
+        .btn-ghost { background: rgba(255,255,255,.06); color: #fff; border-color: rgba(255,255,255,.25); }
+        .btn-ghost:hover { background: rgba(255,255,255,.14); }
+
+        /* ---------- Sections ---------- */
+        section { padding: 72px 0; }
+        .section-head { text-align: center; max-width: 700px; margin: 0 auto 48px; }
+        .section-head h2 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 12px; }
+        .section-head p { color: var(--gray-600); font-size: 1.05rem; }
+        .eyebrow { color: var(--blue-600); font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 10px; }
+
+        /* ---------- Feature Grid ---------- */
+        .grid { display: grid; gap: 24px; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .card {
+            background: #fff; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg); padding: 28px;
+            box-shadow: var(--shadow-sm); transition: all var(--transition);
+        }
+        .card:hover { box-shadow: var(--shadow-md); transform: translateY(-3px); border-color: var(--gray-300); }
+        .card .icon {
+            width: 48px; height: 48px; border-radius: var(--radius);
+            background: var(--blue-50); color: var(--blue-500);
+            display: flex; align-items: center; justify-content: center; margin-bottom: 18px;
+        }
+        .card .icon svg { width: 26px; height: 26px; }
+        .card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+        .card p { color: var(--gray-600); font-size: .95rem; }
+
+        /* ---------- Stack section ---------- */
+        .stack { background: #fff; border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); }
+        .stack-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .stack-item {
+            border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+            padding: 20px 22px; background: var(--gray-50);
+        }
+        .stack-item .label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--gray-500); margin-bottom: 6px; }
+        .stack-item .tech { font-size: 1.02rem; font-weight: 700; color: var(--gray-900); }
+        .stack-item .svc { font-size: .85rem; color: var(--blue-600); margin-top: 2px; }
+
+        /* ---------- Chaos table ---------- */
+        .chaos-table-wrap { overflow-x: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        thead { background: var(--navy-900); }
+        th { text-align: left; padding: 14px 18px; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.85); }
+        td { padding: 14px 18px; font-size: .92rem; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: var(--gray-50); }
+        td .scenario { font-weight: 700; color: var(--gray-900); }
+        td .trigger { color: var(--blue-600); font-weight: 600; white-space: nowrap; }
+        .tag { display: inline-block; background: var(--red-500); color: #fff; font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+
+        /* ---------- Steps ---------- */
+        .steps { grid-template-columns: repeat(3, 1fr); counter-reset: step; }
+        .step { position: relative; padding-top: 8px; }
+        .step .num {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--blue-500); color: #fff; font-weight: 700;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+        }
+        .step h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+        .step p { color: var(--gray-600); font-size: .92rem; }
+        pre {
+            background: var(--navy-900); color: #e6edf3; border-radius: var(--radius);
+            padding: 16px 18px; overflow-x: auto; font-size: .85rem; margin-top: 14px;
+            font-family: 'SF Mono', Menlo, Consolas, monospace; line-height: 1.5;
+        }
+        pre .c { color: #7d8590; }
+        pre .g { color: #7ee787; }
+
+        /* ---------- CTA band ---------- */
+        .cta-band {
+            background: linear-gradient(165deg, var(--navy-800), var(--navy-900));
+            color: #fff; text-align: center; border-radius: var(--radius-lg);
+            padding: 56px 32px; box-shadow: var(--shadow-lg);
+        }
+        .cta-band h2 { font-size: 1.9rem; font-weight: 800; margin-bottom: 12px; }
+        .cta-band p { color: rgba(255,255,255,.78); font-size: 1.05rem; max-width: 560px; margin: 0 auto 28px; }
+
+        /* ---------- Footer ---------- */
+        footer { background: var(--navy-900); color: rgba(255,255,255,.6); padding: 40px 0; font-size: .9rem; }
+        .footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+        footer a { color: rgba(255,255,255,.8); }
+        footer .brand { font-size: 1rem; }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 860px) {
+            .grid-3, .stack-grid, .steps { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 2.2rem; }
+            .nav-links a:not(.nav-cta) { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header class="nav">
+        <div class="container nav-inner">
+            <a class="brand" href="#top">
+                <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg>
+                Contoso Bank
+            </a>
+            <nav class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#stack">Tech Stack</a>
+                <a href="#chaos">Chaos Scenarios</a>
+                <a href="#start">Quick Start</a>
+                <a class="nav-cta" href="https://github.com/AlahmadiQ8/sre-agent-demo">View on GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="top">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="container">
+                <span class="badge-pill">🏦 Azure SRE Agent Demo</span>
+                <h1>Production failures, <span class="accent">on demand.</span></h1>
+                <p class="sub">A demo banking application where realistic failure scenarios are embedded into normal banking workflows. Clicking buttons like "Generate Annual Statement" or "Run Fraud Detection" silently triggers production issues that <strong>Azure SRE Agent</strong> can detect, investigate, and mitigate.</p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary" href="https://github.com/AlahmadiQ8/sre-agent-demo">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.26.82-.577 0-.285-.01-1.04-.015-2.04-3.338.726-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.73.083-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.835 2.807 1.305 3.492.998.108-.776.42-1.305.762-1.605-2.665-.305-5.467-1.335-5.467-5.93 0-1.31.467-2.38 1.235-3.22-.124-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.118 3.176.77.84 1.233 1.91 1.233 3.22 0 4.61-2.807 5.62-5.48 5.92.43.37.823 1.103.823 2.222 0 1.605-.015 2.9-.015 3.293 0 .32.218.694.825.576C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                        View on GitHub
+                    </a>
+                    <a class="btn btn-ghost" href="#chaos">Explore Chaos Scenarios</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section id="features">
+            <div class="container">
+                <div class="section-head">
+                    <span class="eyebrow">Why this demo</span>
+                    <h2>Realistic SRE incidents, repeatable on demand</h2>
+                    <p>Every failure mirrors a real production issue and auto-recovers after 5 minutes — so you can run the same demo again and again.</p>
+                </div>
+                <div class="grid grid-3">
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+                        <h3>8 chaos scenarios</h3>
+                        <p>Memory leaks, CPU spikes, HTTP 500s, DB failures, slow APIs, dependency timeouts, log floods, and exception storms.</p>
+                    </div>
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
+                        <h3>Full observability</h3>
+                        <p>OpenTelemetry logs, metrics, and traces flow to App Insights and Log Analytics — distinct signals for every scenario.</p>
+                    </div>
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3z"/></svg></div>
+                        <h3>SRE Agent ready</h3>
+                        <p>Managed Grafana exposes an MCP endpoint so Azure SRE Agent can query telemetry and investigate incidents directly.</p>
+                    </div>
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg></div>
+                        <h3>One-command deploy</h3>
+                        <p>Bicep + Azure Developer CLI provision everything — infra, app, monitoring, and dashboards — with a single <code>azd up</code>.</p>
+                    </div>
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                        <h3>Auto-recovery</h3>
+                        <p>Each scenario self-heals after 5 minutes, so no manual cleanup is needed between demo runs.</p>
+                    </div>
+                    <div class="card">
+                        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
+                        <h3>Looks like a real bank</h3>
+                        <p>A polished Razor Pages banking UI with accounts, transfers, and transactions — failures hide in plain sight.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech stack -->
+        <section id="stack" class="stack">
+            <div class="container">
+                <div class="section-head">
+                    <span class="eyebrow">Architecture</span>
+                    <h2>Built on Azure, end to end</h2>
+                    <p>A modern .NET 10 stack instrumented with OpenTelemetry and deployed to Azure Container Apps.</p>
+                </div>
+                <div class="grid stack-grid">
+                    <div class="stack-item"><div class="label">Frontend</div><div class="tech">ASP.NET Core Razor Pages</div></div>
+                    <div class="stack-item"><div class="label">Backend</div><div class="tech">ASP.NET Core Web API · .NET 10</div><div class="svc">Azure Container Apps</div></div>
+                    <div class="stack-item"><div class="label">Database</div><div class="tech">Entity Framework Core</div><div class="svc">Azure SQL Database</div></div>
+                    <div class="stack-item"><div class="label">Observability</div><div class="tech">OpenTelemetry SDK</div><div class="svc">App Insights + Log Analytics</div></div>
+                    <div class="stack-item"><div class="label">Dashboards</div><div class="tech">KQL panels</div><div class="svc">Azure Managed Grafana + MCP</div></div>
+                    <div class="stack-item"><div class="label">Infrastructure</div><div class="tech">Bicep + azd</div><div class="svc">One-command deployment</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chaos scenarios -->
+        <section id="chaos">
+            <div class="container">
+                <div class="section-head">
+                    <span class="eyebrow">The fun part</span>
+                    <h2>8 failure scenarios, hidden in banking workflows</h2>
+                    <p>Each scenario is triggered by a natural-looking banking action and produces distinct telemetry for SRE Agent to investigate.</p>
+                </div>
+                <div class="chaos-table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>#</th><th>Scenario</th><th>Trigger</th><th>What breaks</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1</td><td><span class="scenario">Memory Leak</span></td><td><span class="trigger">Reports → Generate Annual Statement</span></td><td>Allocates large byte arrays, causes OOM kill</td></tr>
+                            <tr><td>2</td><td><span class="scenario">CPU Spike</span></td><td><span class="trigger">Dashboard → Run Fraud Detection</span></td><td>CPU-intensive hashing pins all cores</td></tr>
+                            <tr><td>3</td><td><span class="scenario">HTTP 500 Errors</span></td><td><span class="trigger">Transfers → Wire Transfer</span></td><td>Throws an exception on every request</td></tr>
+                            <tr><td>4</td><td><span class="scenario">DB Connection Failure</span></td><td><span class="trigger">Accounts → Refresh</span></td><td>Interceptor blocks all database queries</td></tr>
+                            <tr><td>5</td><td><span class="scenario">Slow API (30s)</span></td><td><span class="trigger">Transfers → International Transfer</span></td><td>30-second delay in the transfer pipeline</td></tr>
+                            <tr><td>6</td><td><span class="scenario">Dependency Timeout</span></td><td><span class="trigger">Settings → Verify Identity (KYC)</span></td><td>Call to non-routable IP exhausts thread pool</td></tr>
+                            <tr><td>7</td><td><span class="scenario">Log Flooding</span></td><td><span class="trigger">Transactions → Export Full History</span></td><td>Thousands of verbose log entries per second</td></tr>
+                            <tr><td>8</td><td><span class="scenario">Exception Storm</span></td><td><span class="trigger">Reports → Run Batch Reconciliation</span></td><td>Parallel tasks throw diverse exception types</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick start -->
+        <section id="start" class="stack">
+            <div class="container">
+                <div class="section-head">
+                    <span class="eyebrow">Get started</span>
+                    <h2>Deploy everything in one command</h2>
+                    <p>Provision infra, build and deploy the app, configure monitoring, and import dashboards — all with <code>azd up</code>.</p>
+                </div>
+                <div class="grid steps">
+                    <div class="step">
+                        <div class="num">1</div>
+                        <h3>Clone the repo</h3>
+                        <p>Grab the source and move into the project directory.</p>
+                        <pre><span class="c"># Clone &amp; enter</span>
+git clone https://github.com/AlahmadiQ8/sre-agent-demo.git
+cd sre-agent-demo</pre>
+                    </div>
+                    <div class="step">
+                        <div class="num">2</div>
+                        <h3>Deploy to Azure</h3>
+                        <p>One command provisions all resources and deploys the container.</p>
+                        <pre><span class="c"># Infra + app + monitoring</span>
+<span class="g">azd up</span></pre>
+                    </div>
+                    <div class="step">
+                        <div class="num">3</div>
+                        <h3>Connect SRE Agent</h3>
+                        <p>Wire up the Grafana MCP endpoint and start an investigation.</p>
+                        <pre><span class="c"># Get the MCP endpoint</span>
+azd env get-value \
+  GRAFANA_MCP_ENDPOINT</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section>
+            <div class="container">
+                <div class="cta-band">
+                    <h2>Ready to break some banking?</h2>
+                    <p>Clone the demo, deploy with a single command, and watch Azure SRE Agent detect, investigate, and mitigate real incidents.</p>
+                    <div class="hero-actions">
+                        <a class="btn btn-primary" href="https://github.com/AlahmadiQ8/sre-agent-demo">Get the code</a>
+                        <a class="btn btn-ghost" href="https://learn.microsoft.com/en-us/azure/sre-agent/overview">Learn about SRE Agent</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container footer-inner">
+            <a class="brand" href="#top">
+                <svg class="logo" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg>
+                Contoso Bank
+            </a>
+            <div>For demonstration purposes only · <a href="https://github.com/AlahmadiQ8/sre-agent-demo">GitHub</a> · <a href="https://learn.microsoft.com/en-us/azure/sre-agent/overview">Azure SRE Agent</a></div>
+        </div>
+    </footer>
+</body>
+</html>
