@@ -1,5 +1,7 @@
 # Contoso Bank — Azure SRE Agent Demo
 
+**Languages:** English | [العربية](#العربية-arabic)
+
 A demo banking application for [Azure SRE Agent](https://learn.microsoft.com/en-us/azure/sre-agent/overview). Failure scenarios are embedded into normal banking workflows — clicking buttons like "Generate Annual Statement" or "Run Fraud Detection" silently triggers realistic production issues (memory leaks, CPU spikes, HTTP 500s, etc.) that SRE Agent can detect, investigate, and mitigate.
 
 ## Table of Contents
@@ -319,3 +321,111 @@ This deletes the resource group and all resources within it, including the SQL d
 ## License
 
 This project is for demonstration purposes. See [LICENSE](LICENSE) for details.
+
+---
+
+<div dir="rtl">
+
+## العربية (Arabic)
+
+# كونتوسو بنك — عرض توضيحي لوكيل Azure SRE
+
+تطبيق مصرفي توضيحي خاص بـ [وكيل Azure SRE](https://learn.microsoft.com/en-us/azure/sre-agent/overview). تم تضمين سيناريوهات الأعطال داخل مهام مصرفية اعتيادية — فعند النقر على أزرار مثل "إنشاء كشف حساب سنوي" أو "تشغيل كشف الاحتيال" يتم تشغيل مشكلات إنتاجية واقعية بصمت (تسريبات الذاكرة، وارتفاعات استهلاك المعالج، وأخطاء HTTP 500، وغيرها) يستطيع وكيل SRE اكتشافها والتحقيق فيها ومعالجتها.
+
+### المعمارية
+
+يعمل التطبيق على **Azure Container Apps** ويتكوّن من واجهة أمامية مبنية بـ Razor Pages تتواصل مع واجهة برمجة تطبيقات ASP.NET Core Web API. ترسل الواجهة الخلفية بيانات القياس (السجلات والمقاييس والتتبع) عبر OpenTelemetry إلى **Application Insights + Log Analytics**، وتُخزّن بياناتها في **قاعدة بيانات Azure SQL**. تُعرض لوحات المعلومات عبر **Azure Managed Grafana** التي توفّر أيضًا نقطة نهاية MCP يستخدمها وكيل SRE.
+
+### المكوّنات التقنية
+
+| الطبقة | التقنية | خدمة Azure |
+|-------|-----------|---------------|
+| الواجهة الأمامية | ASP.NET Core Razor Pages | — |
+| الواجهة الخلفية | ASP.NET Core Web API (‏C# / ‏.NET 10) | Azure Container Apps |
+| قاعدة البيانات | Entity Framework Core | Azure SQL Database |
+| المراقبة | OpenTelemetry SDK (سجلات، مقاييس، تتبع) | App Insights + Log Analytics |
+| لوحات المعلومات | Azure Managed Grafana (‏KQL) | Grafana + نقطة نهاية MCP |
+| البنية التحتية كشيفرة | Bicep + Azure Developer CLI (`azd`) | نشر بأمر واحد |
+
+### المتطلبات المسبقة
+
+- [‏Azure Developer CLI (`azd`)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd) الإصدار 1.9 أو أحدث
+- [‏Azure CLI (`az`)](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) الإصدار 2.60 أو أحدث
+- [‏.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [‏Docker Desktop](https://www.docker.com/products/docker-desktop/) (لبناء الحاويات محليًا)
+- اشتراك Azure مع صلاحيات إنشاء الموارد (‏Contributor + User Access Administrator)
+
+### البدء السريع
+
+#### النشر بأمر واحد
+
+```bash
+# استنساخ المستودع
+git clone https://github.com/<org>/sre-agent-demo.git
+cd sre-agent-demo
+
+# نشر كل شيء (البنية التحتية + التطبيق + المراقبة + لوحات المعلومات)
+azd up
+```
+
+يقوم الأمر `azd up` بتجهيز جميع موارد Azure، وبناء الحاوية ونشرها، وتشغيل سكربت ما بعد التجهيز الذي يمنح الهوية المُدارة صلاحية الوصول إلى قاعدة البيانات، ويملأ البيانات التجريبية، ويهيّئ Grafana، ويعرض نقطة نهاية MCP الخاصة بـ Grafana وتعليمات إعداد وكيل SRE.
+
+#### التطوير المحلي
+
+```bash
+# البناء والتشغيل محليًا (يستخدم قاعدة بيانات EF Core داخل الذاكرة)
+cd src/ContosoBank
+dotnet run
+```
+
+يتوفّر التطبيق على العنوان `http://localhost:8080`، ويوفّر نقاط النهاية `/health/live` (فحص الحيوية) و`/health/ready` (فحص الجاهزية واتصال قاعدة البيانات).
+
+### سيناريوهات الأعطال (‏Chaos)
+
+يتضمّن العرض **8 سيناريوهات أعطال مختلفة**، يُشغَّل كل منها عبر إجراء مصرفي يبدو طبيعيًا. يتعافى كل سيناريو تلقائيًا بعد 5 دقائق حتى يمكن تكرار العرض دون تنظيف يدوي.
+
+| # | السيناريو | الصفحة ← الزر | ما الذي يتعطّل |
+|---|----------|--------------|----------------|
+| 1 | **تسريب الذاكرة** | التقارير ← "إنشاء كشف حساب سنوي" | تخصيص مصفوفات بايت كبيرة يؤدي إلى إنهاء بسبب نفاد الذاكرة |
+| 2 | **ارتفاع استهلاك المعالج** | لوحة المعلومات ← "تشغيل كشف الاحتيال" | حسابات تجزئة مكثّفة تُشبع جميع الأنوية |
+| 3 | **أخطاء HTTP 500** | التحويلات ← "تحويل برقي" | استثناء `InvalidOperationException` في كل طلب |
+| 4 | **فشل اتصال قاعدة البيانات** | الحسابات ← "تحديث" | معترض يحظر جميع استعلامات قاعدة البيانات |
+| 5 | **واجهة برمجة بطيئة (30 ثانية)** | التحويلات ← "تحويل دولي" | تأخير `Task.Delay(30s)` في مسار التحويل |
+| 6 | **انتهاء مهلة الاعتمادية** | الإعدادات ← "التحقق من الهوية (‏KYC)" | استدعاء لعنوان IP غير قابل للتوجيه واستنفاد تجمّع المهام |
+| 7 | **إغراق السجلات** | المعاملات ← "تصدير السجل الكامل" | آلاف السجلات المفصّلة في الثانية |
+| 8 | **عاصفة الاستثناءات** | التقارير ← "تشغيل تسوية الدُفعات" | مهام متوازية ترمي أنواعًا متعددة من الاستثناءات |
+
+### إعداد وكيل Azure SRE
+
+تعرض كل نسخة من Azure Managed Grafana نقطة نهاية MCP مدمجة على المسار `/api/azure-mcp`. بعد تشغيل `azd up`، احصل على نقطة النهاية الخاصة بك:
+
+```bash
+azd env get-value GRAFANA_MCP_ENDPOINT
+```
+
+يُنصح باستخدام رمز حساب خدمة Grafana للحصول على إعداد يتم لمرة واحدة ولا تنتهي صلاحيته. من خلال نقطة نهاية MCP هذه يحصل وكيل SRE على إمكانية الاستعلام عن App Insights و Log Analytics ومقاييس Azure Monitor مباشرةً عبر Grafana.
+
+> 📋 راجع [DEMO.md](DEMO.md) للحصول على شرح تفصيلي للعرض التوضيحي والتدفق المقترح.
+
+### تشغيل الاختبارات
+
+```bash
+dotnet test
+```
+
+تستخدم الاختبارات `WebApplicationFactory` مع موفّر EF Core داخل الذاكرة، ولا تتطلّب أي اعتماديات خارجية.
+
+### إزالة الموارد
+
+```bash
+# إزالة جميع موارد Azure
+azd down --force --purge
+```
+
+يؤدي ذلك إلى حذف مجموعة الموارد وكل ما بداخلها، بما في ذلك قاعدة بيانات SQL وتطبيق الحاوية ونسخة Grafana وجميع بيانات المراقبة.
+
+### الترخيص
+
+هذا المشروع لأغراض العرض التوضيحي. راجع [LICENSE](LICENSE) لمزيد من التفاصيل.
+
+</div>
