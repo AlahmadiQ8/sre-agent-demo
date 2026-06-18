@@ -2,6 +2,19 @@
 
 A demo banking application for [Azure SRE Agent](https://learn.microsoft.com/en-us/azure/sre-agent/overview). Failure scenarios are embedded into normal banking workflows — clicking buttons like "Generate Annual Statement" or "Run Fraud Detection" silently triggers realistic production issues (memory leaks, CPU spikes, HTTP 500s, etc.) that SRE Agent can detect, investigate, and mitigate.
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Chaos Scenarios](#chaos-scenarios)
+- [Azure SRE Agent Setup](#azure-sre-agent-setup)
+- [Project Structure](#project-structure)
+- [Running Tests](#running-tests)
+- [Cleanup](#cleanup)
+- [License](#license)
+
+
 ## Architecture
 
 ```mermaid
@@ -188,11 +201,59 @@ Through this MCP endpoint, SRE Agent gets access to tools like `amgmcp_query_res
 
 ### Investigation Workflows
 
-<!-- TODO: Document SRE Agent investigation workflows for each chaos scenario -->
+Once connected, SRE Agent (and any engineer using Grafana) can investigate each scenario by following the telemetry trail. Every chaos action emits a distinctive combination of an Azure Monitor alert (`A1`–`A10`), a custom metric, and structured logs. The activation/recovery of each scenario is also logged via `ChaosScenario activated` / `ChaosScenario recovered` warnings, which act as ground-truth markers when correlating signals.
+
+| Scenario | Alert(s) | Primary Signal | Distinguishing Clue |
+|----------|----------|----------------|---------------------|
+| Memory Leak | A1 (High Memory), A2 (OOM Restart) | `dotnet.process.memory.working_set` climbs steadily | Memory grows without leveling off; ends in container restart |
+| CPU Spike | A3 (High CPU) | `process.cpu.time` pinned > 95% | CPU saturated while memory stays flat |
+| HTTP 500 Errors | A4 (HTTP 5xx) | 5xx rate on `/api/transfers/wire` | `InvalidOperationException` traces on a single endpoint |
+| DB Connection Failure | A5 (DB Failures), A10 (Health Degraded) | `contosobank.db.errors` spike | `/health/ready` flips to unhealthy; DB query errors flood |
+| Slow API (30s) | A6 (P95 Latency) | P95/P99 latency spike on `/api/transfers/international` | Latency high but CPU **and** memory normal → external dependency |
+| Dependency Timeout | A7 (Dependency Timeout) | `contosobank.dependency.timeouts` spike | Timeout exceptions tagged `dependency=kyc_provider` |
+| Log Flooding | A8 (Log Volume) | `contosobank.log.entries` rockets (~1000/s) | Sudden flood of `Debug`-level `Transaction batch item` logs |
+| Exception Storm | A9 (Exception Storm) | `contosobank.exceptions` spike (~20/s) | **Multiple** exception types appear together (Null/Argument/DivideByZero/Format) |
+
+**Suggested investigation steps for SRE Agent:**
+
+1. **Start from the alert.** The firing alert (`A1`–`A10`) narrows the problem class immediately. Use the [Alert-to-Scenario Mapping](DEMO.md#alert-to-scenario-mapping) to identify the likely trigger.
+2. **Confirm with metrics.** Query the custom `ContosoBank` meter (e.g. `contosobank.exceptions`, `contosobank.db.errors`) or platform metrics (`process.cpu.time`, `dotnet.process.memory.working_set`) to confirm the signature.
+3. **Correlate logs.** Search Log Analytics for the matching exception type or the `ChaosScenario activated` warning to pinpoint the start time and affected component.
+4. **Differentiate look-alikes.** Slow API vs. CPU/Memory issues all surface as a degraded user experience — the distinguishing factor is *which* resource is saturated (see the "Distinguishing Clue" column above).
+
+Example KQL to find the exact moment a scenario was triggered:
+
+```kusto
+AppTraces
+| where Message startswith "ChaosScenario activated"
+| project TimeGenerated, Message
+| order by TimeGenerated desc
+```
 
 ### Mitigation Playbooks
 
-<!-- TODO: Document automated mitigation actions SRE Agent can take -->
+Every chaos scenario in this demo is **self-healing**: it activates a `CancellationTokenSource` with a 5-minute timeout (`DefaultDuration`), after which the scenario automatically deactivates and logs `ChaosScenario recovered`. This makes the demo safe to repeat without manual cleanup, and lets SRE Agent observe a full detect → investigate → resolve lifecycle.
+
+| Scenario | Auto-Recovery Behavior | Manual Mitigation |
+|----------|------------------------|-------------------|
+| Memory Leak | Held byte arrays are released after 5 min, **but GC may not reclaim them until the process restarts** | Restart the container revision (see below) |
+| CPU Spike | CPU loops stop after 5 min | None required |
+| HTTP 500 Errors | Error injection stops after 5 min | None required |
+| DB Connection Failure | DB interceptor stops blocking after 5 min; `/health/ready` recovers | None required |
+| Slow API | Latency injection stops after 5 min | None required |
+| Dependency Timeout | Timeout injection stops after 5 min | None required |
+| Log Flooding | Log generation stops after 5 min | None required |
+| Exception Storm | Exception loop stops after 5 min | None required |
+
+**Guaranteed clean reset.** Because a memory leak can persist until the process restarts, restart the Container App revision to force a fully clean state:
+
+```bash
+APP=$(az containerapp list -g rg-sre-agent-demo-2 --query "[0].name" -o tsv)
+az containerapp revision restart -g rg-sre-agent-demo-2 -n $APP \
+  --revision $(az containerapp revision list -g rg-sre-agent-demo-2 -n $APP --query "[?properties.active].name | [0]" -o tsv)
+```
+
+> 💡 In a real incident, SRE Agent would propose a mitigation (e.g. scale out, restart the revision, roll back a deployment) and ask for approval before acting. This demo's auto-recovery simulates the "resolved" state so you can showcase the full agent workflow end-to-end. See [DEMO.md](DEMO.md#resetting-the-app-after-a-demo) for the full reset procedure.
 
 ## Project Structure
 
